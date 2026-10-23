@@ -202,3 +202,4 @@ respect privacy law + source ToS.
 - OSINT_APP's AI briefs / bulk-protect / encrypted per-session keys live in `modules/threat_intel/legacy_app.py` — ported on demand into `app.py`.
 - campwill Jinja templates kept under `modules/forensics/templates_ref` for reference.
 - OSINTel streaming SSE + clone-url tools: executor supports streaming; clone-on-install intentionally left out for server hardening (add allowlist if needed).
+# Xaxglog
