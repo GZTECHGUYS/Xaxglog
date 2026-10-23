@@ -1,0 +1,40 @@
+/* Xaxglog cyber theme layer — global accents over the inline-styled console. */
+
+/* deep-space backdrop with faint scanline grid */
+body {
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(0,229,255,0.06), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(255,46,99,0.05), transparent 55%),
+    repeating-linear-gradient(0deg, rgba(0,229,255,0.025) 0 1px, transparent 1px 3px),
+    #010409;
+  color:#c9f3ff;
+}
+
+/* neon tab accent */
+.tabBtn {
+  font-family: ui-monospace, Menlo, monospace;
+  letter-spacing: 0.04em;
+  transition: box-shadow .15s ease, color .15s ease;
+}
+.tabBtn:hover { box-shadow: 0 0 10px rgba(0,229,255,0.35); }
+.tabBtn.active {
+  box-shadow: 0 0 14px rgba(0,229,255,0.55);
+  text-shadow: 0 0 6px rgba(0,229,255,0.8);
+}
+
+/* monospace for any code-ish block */
+code, pre, kbd, samp {
+  font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+}
+
+/* thin neon scrollbar */
+::-webkit-scrollbar { width:10px; height:10px; }
+::-webkit-scrollbar-track { background:#010409; }
+::-webkit-scrollbar-thumb { background:#1b2a44; border-radius:6px; }
+::-webkit-scrollbar-thumb:hover { background:#00e5ff55; }
+
+/* input focus glow across panels */
+input:focus, textarea:focus, select:focus {
+  box-shadow: 0 0 0 1px rgba(0,229,255,0.45), 0 0 12px rgba(0,229,255,0.2);
+  outline: none;
+}

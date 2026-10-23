@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Xaxglog — OSINT Console</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#070b12;--panel:#0e1522;--panel2:#121c2d;--line:#223047;
+  --text:#e6edf3;--muted:#8b98a9;--accent:#58a6ff;--blue:#1f6feb;
+  --green:#3fb950;--orange:#e67e22;--red:#e74c3c;--purple:#8957e5;--yellow:#d29922;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:radial-gradient(1100px 500px at 15% -10%,#13233c 0%,var(--bg) 55%) no-repeat,var(--bg);
+  color:var(--text);font:14px/1.55 system-ui,Segoe UI,Roboto,sans-serif}
+header{position:sticky;top:0;z-index:30;display:flex;gap:18px;align-items:center;justify-content:space-between;
+  padding:16px 26px;border-bottom:1px solid var(--line);background:rgba(9,14,23,.88);backdrop-filter:blur(14px)}
+.brand{display:flex;gap:12px;align-items:center;min-width:0}
+.logo{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-weight:800;font-size:19px;
+  color:#fff;background:linear-gradient(135deg,#1f6feb,#8957e5);box-shadow:0 0 20px rgba(31,111,235,.35)}
+h1{margin:0;font-size:18px;letter-spacing:.4px;white-space:nowrap}h1 span{color:var(--accent);font-weight:500}
+.sub{color:var(--muted);font-size:12px;margin-top:2px}
+.auth{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+main{max-width:1320px;margin:0 auto;padding:22px 24px 40px}
+.legal{margin-top:18px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:rgba(14,21,34,.6);
+  color:var(--muted);font-size:12px}
+footer{color:var(--muted);font-size:12px;padding:18px;text-align:center;border-top:1px solid var(--line)}
+.nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.nav button{background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:9px 16px;border-radius:999px;
+  cursor:pointer;font-weight:600;font-size:13px}
+.nav button.on{background:linear-gradient(135deg,#1f6feb,#2d8cff);border-color:#2d8cff;color:#fff}
+.view{display:none}.view.on{display:block}
+.card{background:linear-gradient(180deg,rgba(18,28,45,.92),rgba(14,21,34,.92));border:1px solid var(--line);
+  border-radius:12px;padding:18px;margin-bottom:16px}
+.card h2,.card h3{margin:0 0 4px;font-size:16px;color:var(--text)}
+.card p.desc{margin:0 0 14px;color:var(--muted);font-size:12px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input,select,button,textarea{font:inherit}
+input,select,textarea{border-radius:8px;border:1px solid #2a3a52;background:#0b1220;color:var(--text);padding:10px 12px;font-size:13px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(31,111,235,.15)}
+input[type=checkbox]{width:auto;min-width:0;accent-color:var(--blue)}
+.searchbar{display:flex;gap:10px;flex-wrap:wrap}
+.searchbar input{flex:1;min-width:260px;font-size:15px;padding:13px 15px}
+button{border-radius:8px;border:1px solid var(--blue);background:var(--blue);color:#fff;padding:10px 15px;
+  cursor:pointer;font-weight:650;font-size:13px;white-space:nowrap}
+button:hover{filter:brightness(1.1)}button:disabled{opacity:.55;cursor:wait}
+button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
+button.green{background:#238636;border-color:#2ea043}button.orange{background:#b35c00;border-color:var(--orange)}
+button.small{padding:5px 9px;font-size:11px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+.tab{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:#0b1220;color:var(--muted);
+  cursor:pointer;font-size:12px}
+.tab.on{background:#1a2b45;border-color:#3b82f6;color:#fff}
+.badge,.pill,.tag{display:inline-flex;align-items:center;gap:5px;border-radius:999px;font-size:11px;padding:3px 9px;
+  border:1px solid var(--line);background:#121c2d;color:var(--muted);margin:0 4px 4px 0}
+.pill.ok,.badge.ok{color:#7ee787;border-color:#2ea043;background:rgba(46,160,67,.12)}
+.pill.err,.badge.err{color:#ff7b72;border-color:#da3633;background:rgba(218,54,51,.12)}
+.pill.warn,.badge.warn{color:#e3b341;border-color:#9e6a03;background:rgba(158,106,3,.14)}
+.pill.info,.badge.info{color:#79c0ff;border-color:#1f6feb;background:rgba(31,111,235,.14)}
+.pill.purple{color:#d2a8ff;border-color:#8957e5;background:rgba(137,87,229,.14)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px;margin:12px 0 4px}
+.stat{background:#0b1220;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.stat .v{font-size:21px;font-weight:750;color:var(--text);line-height:1.2}
+.stat .l{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-top:3px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px}
+.cardlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.hit{display:block;background:#0b1220;border:1px solid var(--line);border-radius:9px;padding:11px 12px;
+  text-decoration:none;color:var(--text);transition:border-color .15s,transform .15s;min-width:0}
+.hit:hover{border-color:#3b82f6;transform:translateY(-1px)}
+.hit .top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hit .plat{font-weight:700;font-size:12.5px;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hit .who{color:var(--text);font-size:12px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hit .url{color:var(--muted);font-size:10.5px;margin-top:4px;word-break:break-all;max-height:2.6em;overflow:hidden}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+pre{background:#060a11;border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto;max-height:560px;
+  font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+details{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#0b1220;margin-bottom:10px}
+summary{cursor:pointer;font-weight:650;color:var(--accent);font-size:12.5px}
+.axis{border-left:3px solid var(--blue)}
+.axis.ok{border-left-color:var(--green)}.axis.err{border-left-color:var(--red)}.axis.warn{border-left-color:var(--orange)}
+.statusline{color:var(--muted);font-size:12px;min-height:20px;margin-top:10px}
+.progress{height:7px;background:#0b1220;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin:12px 0 8px}
+.progress .bar{height:100%;width:0;background:linear-gradient(90deg,#1f6feb,#8957e5,#2ea043);transition:width .4s}
+.spinner{width:18px;height:18px;border:2px solid #2a3a52;border-top-color:var(--accent);border-radius:50%;
+  display:inline-block;animation:spin .9s linear infinite;vertical-align:-3px;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{position:sticky;top:0;background:#121c2d;color:var(--muted);text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);font-weight:650}
+td{padding:8px 10px;border-bottom:1px solid #172234;vertical-align:top}
+tr:last-child td{border-bottom:none}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+.muted{color:var(--muted)}.green{color:var(--green)}.red{color:var(--red)}.orange{color:var(--orange)}
+.hidden{display:none!important}
+.empty{color:var(--muted);font-size:12px;padding:10px 0}
+.loginbox{display:grid;grid-template-columns:1fr 1fr auto auto;gap:8px;align-items:end}
+.loginbox label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:3px}
+@media(max-width:720px){
+  header{align-items:flex-start;flex-direction:column;padding:14px 16px}
+  main{padding:16px 14px 30px}.loginbox{grid-template-columns:1fr 1fr}
+  .grid2{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">X</div>
+    <div>
+      <h1>XAXGLOG <span>// OSINT CONSOLE</span></h1>
+      <div class="sub">International deep search · social footprint · intense recon · source catalog</div>
+    </div>
+  </div>
+  <div class="auth">
+    <span class="badge" id="health">checking backend…</span>
+    <span class="badge" id="authState">guest</span>
+    <button class="ghost small" id="loginToggle">Login</button>
+    <button class="ghost small hidden" id="logoutBtn">Logout</button>
+  </div>
+</header>
+
+<main>
+  <nav class="nav">
+    <button data-view="search" class="on">Search</button>
+    <button data-view="intense">Intense Recon</button>
+    <button data-view="sources">Sources</button>
+  </nav>
+
+  <div id="loginPanel" class="card hidden">
+    <h3>Operator login</h3>
+    <p class="desc">JWT login unlocks intense recon, case attachment and the case entity graph. Deep search and profile lookup remain available as guest.</p>
+    <div class="loginbox">
+      <div><label for="username">Username</label><input id="username" autocomplete="username" placeholder="admin"/></div>
+      <div><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" placeholder="••••••••"/></div>
+      <button id="loginBtn">Sign in</button>
+      <span class="statusline" id="loginStatus"></span>
+    </div>
+  </div>
+
+  <!-- ============================================================ SEARCH -->
+  <section class="view on" id="view-search">
+    <div class="card">
+      <h2>Deep search</h2>
+      <p class="desc">Auto-detects names, handles, emails, phones, domains, IPs and companies. Name searches fan out across 90+ public platforms and 10 people indexes.</p>
+      <div class="searchbar">
+        <input id="q" placeholder="e.g. Jane Doe / jane_doe / jane@example.com / example.com / +1 202-555-0143 / https://x.com/jane"/>
+        <button id="go">Search</button>
+      </div>
+      <div class="tabs" id="modes">
+        <button class="tab on" data-t="auto">Auto-detect</button>
+        <button class="tab" data-t="username">Username</button>
+        <button class="tab" data-t="email">Email</button>
+        <button class="tab" data-t="phone">Phone</button>
+        <button class="tab" data-t="domain">Domain</button>
+        <button class="tab" data-t="ip">IP</button>
+        <button class="tab" data-t="person">Person</button>
+        <button class="tab" data-t="social">Social</button>
+        <button class="tab" data-t="profile">Profile URL</button>
+        <button class="tab" data-t="company">Company</button>
+        <button class="tab" data-t="geo">Place</button>
+      </div>
+      <div class="row">
+        <label class="badge"><input type="checkbox" id="includeSocial" checked/> social web discovery</label>
+        <span class="statusline" id="searchStatus"></span>
+      </div>
+    </div>
+
+    <div class="stats" id="searchSummary"></div>
+
+    <div class="grid2">
+      <div class="card">
+        <h3>Profiles</h3>
+        <p class="desc">Exact public profile hits across the platform matrix.</p>
+        <div class="tabs" id="profileFilters"></div>
+        <div class="cardlist" id="profiles"><div class="empty">Run a search to populate profiles.</div></div>
+      </div>
+      <div class="card">
+        <h3>Leads</h3>
+        <p class="desc">People-index matches, social discovery results, subdomains and extracted pivots.</p>
+        <div class="cardlist" id="leads"><div class="empty">Run a search to populate leads.</div></div>
+      </div>
+    </div>
+
+    <details class="card">
+      <summary>Raw response</summary>
+      <div class="row" style="margin:10px 0">
+        <button class="ghost small" id="copySearch">Copy JSON</button>
+        <button class="ghost small" id="downloadSearch">Download JSON</button>
+        <span class="statusline" id="searchCopyStatus"></span>
+      </div>
+      <pre id="out">Run a search above.</pre>
+    </details>
+  </section>
+
+  <!-- ============================================================ INTENSE -->
+  <section class="view" id="view-intense">
+    <div class="card">
+      <h2>Intense recon</h2>
+      <p class="desc">Target-aware multi-axis investigation: identity fan-out, social footprint, people indexes, name variants, sanctions/courts, corporate ownership, crawl, Wayback, leak search, netblock and ports. Attach a case to emit entities, edges and hashed evidence.</p>
+      <div class="row">
+        <input id="intenseTarget" style="flex:1;min-width:260px;font-size:15px;padding:13px 15px" placeholder="target — Jane Doe / jane@example.com / example.com / 8.8.8.8 / Acme Ltd"/>
+        <select id="caseSelect" title="Optional case attachment"><option value="">no case</option></select>
+        <button class="orange" id="intenseGo">Run intense recon</button>
+      </div>
+      <div id="intenseAuthHint" class="statusline">Login required for intense recon — use the Login button above.</div>
+      <div class="progress"><div class="bar" id="intenseBar"></div></div>
+      <div class="statusline" id="intenseStatus"></div>
+    </div>
+    <div id="intenseResult"></div>
+  </section>
+
+  <!-- ============================================================ SOURCES -->
+  <section class="view" id="view-sources">
+    <div class="card">
+      <h2>Source catalog</h2>
+      <p class="desc">Every configured profile platform, people index and scraper limit. Public/open sources only — no login walls or paywalled law-enforcement databases.</p>
+      <div class="stats" id="sourcesSummary"></div>
+    </div>
+    <div class="grid" id="sourcesCategories"></div>
+    <details class="card">
+      <summary>Full platform list</summary>
+      <div class="tablewrap" style="margin-top:12px"><table id="platformTable"><thead><tr><th>Platform</th><th>Category</th><th>Region</th><th>Profile URL template</th></tr></thead><tbody></tbody></table></div>
+    </details>
+  </section>
+
+  <div class="legal"><strong>Legal note:</strong> Xaxglog queries public/free OSINT sources only — including public profile pages, never login walls. No classified or paywalled law-enforcement databases. Obtain authorization before investigating identifiable individuals; respect GDPR/privacy law, robots/rate limits and each source's ToS. Name matches and profile existence are leads, not identity proof.</div>
+</main>
+
+<footer>Xaxglog · unified OSINT (threat-intel + forensics + runner + catalog + deep-search + intense recon)</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pct = n => Math.max(0, Math.min(100, Number(n) || 0));
+
+const state = {
+  view: "search",
+  mode: "auto",
+  token: localStorage.getItem("xaxglog_token") || "",
+  user: null,
+  lastSearch: null,
+  lastProfiles: [],
+  profileFilter: "all",
+  sourcesLoaded: false,
+  intenseTimer: null,
+  intenseStart: 0,
+};
+
+/* ------------------------------------------------------------------ api */
+async function api(path, opts = {}) {
+  const headers = { ...(opts.headers || {}) };
+  if (state.token) headers.Authorization = "Bearer " + state.token;
+  let body = opts.body;
+  if (body && typeof body !== "string") {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(body);
+  }
+  const r = await fetch(path, { ...opts, headers, body });
+  let data;
+  try { data = await r.json(); } catch { data = { error: r.statusText || ("HTTP " + r.status) }; }
+  if (!r.ok) {
+    const err = new Error(data.error || ("HTTP " + r.status));
+    err.status = r.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
+
+/* ------------------------------------------------------------------ views */
+document.querySelectorAll(".nav button").forEach(b => b.onclick = () => {
+  state.view = b.dataset.view;
+  document.querySelectorAll(".nav button").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "view-" + state.view));
+  if (state.view === "sources" && !state.sourcesLoaded) loadSources();
+  if (state.view === "intense") loadCases();
+});
+
+const placeholders = {
+  auto: "e.g. Jane Doe / jane_doe / jane@example.com / example.com / +1 202-555-0143 / Acme Ltd",
+  username: "handle — e.g. jane_doe",
+  email: "email — e.g. jane@example.com",
+  phone: "phone — e.g. +1 202-555-0143",
+  domain: "domain — e.g. example.com",
+  ip: "IP — e.g. 8.8.8.8",
+  person: "full name or handle — e.g. Jane Doe / jane_doe",
+  social: "handle or full name — e.g. jane_doe / Jane Doe",
+  profile: "public profile URL — e.g. https://www.instagram.com/jane_doe/",
+  company: "company name — e.g. Acme Ltd",
+  geo: "place — e.g. Berlin, Germany",
+};
+document.querySelectorAll("#modes .tab").forEach(b => b.onclick = () => {
+  state.mode = b.dataset.t;
+  document.querySelectorAll("#modes .tab").forEach(x => x.classList.toggle("on", x === b));
+  $("q").placeholder = placeholders[state.mode] || placeholders.auto;
+});
+
+/* ------------------------------------------------------------------ auth */
+function updateAuthUI() {
+  $("authState").textContent = state.user ? (state.user.username + " · " + state.user.role) : "guest";
+  $("authState").className = "badge " + (state.user ? "ok" : "");
+  $("loginToggle").classList.toggle("hidden", !!state.user);
+  $("logoutBtn").classList.toggle("hidden", !state.user);
+  $("intenseAuthHint").classList.toggle("hidden", !!state.user);
+}
+$("loginToggle").onclick = () => $("loginPanel").classList.toggle("hidden");
+async function doLogin() {
+  const username = $("username").value.trim();
+  const password = $("password").value;
+  if (!username || !password) { $("loginStatus").textContent = "username + password required"; return; }
+  $("loginStatus").innerHTML = '<span class="spinner"></span>signing in…';
+  try {
+    const j = await api("/api/auth/login", { method: "POST", body: { username, password } });
+    state.token = j.token || "";
+    state.user = j.user || { username, role: "analyst" };
+    localStorage.setItem("xaxglog_token", state.token);
+    localStorage.setItem("xaxglog_user", JSON.stringify(state.user));
+    $("loginPanel").classList.add("hidden");
+    $("password").value = "";
+    $("loginStatus").textContent = "";
+    updateAuthUI();
+    loadCases();
+  } catch (e) {
+    $("loginStatus").textContent = e.message;
+  }
+}
+$("loginBtn").onclick = doLogin;
+$("password").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+$("logoutBtn").onclick = () => {
+  state.token = ""; state.user = null;
+  localStorage.removeItem("xaxglog_token"); localStorage.removeItem("xaxglog_user");
+  updateAuthUI(); $("caseSelect").innerHTML = '<option value="">no case</option>';
+};
+
+try { state.user = JSON.parse(localStorage.getItem("xaxglog_user") || "null"); } catch {}
+updateAuthUI();
+if (state.token) {
+  api("/api/auth/me").then(u => { state.user = u; updateAuthUI(); loadCases(); })
+    .catch(() => { state.token = ""; state.user = null; localStorage.removeItem("xaxglog_token"); localStorage.removeItem("xaxglog_user"); updateAuthUI(); });
+}
+
+/* ------------------------------------------------------------------ search */
+$("go").onclick = runSearch;
+$("q").addEventListener("keydown", e => { if (e.key === "Enter") runSearch(); });
+$("copySearch").onclick = () => copyJSON(state.lastSearch, "searchCopyStatus");
+$("downloadSearch").onclick = () => downloadJSON(state.lastSearch, "xaxglog-search");
+
+async function runSearch() {
+  const q = $("q").value.trim();
+  if (!q) return;
+  const btn = $("go");
+  btn.disabled = true; btn.textContent = "Searching…";
+  $("searchStatus").innerHTML = '<span class="spinner"></span>querying public sources…';
+  $("out").textContent = "Querying international sources for: " + q + " …";
+  const t0 = performance.now();
+  try {
+    let j;
+    if (state.mode === "auto") {
+      j = await api("/api/deep/search", { method: "POST", body: { query: q } });
+    } else if (state.mode === "geo") {
+      j = await api("/api/deep/geo?place=" + encodeURIComponent(q));
+    } else if (state.mode === "company") {
+      j = await api("/api/deep/company?q=" + encodeURIComponent(q));
+    } else if (state.mode === "profile") {
+      j = await api("/api/deep/profile", { method: "POST", body: { url: q } });
+    } else if (state.mode === "social") {
+      j = await api("/api/deep/social", { method: "POST", body: { query: q, include_web: $("includeSocial").checked } });
+    } else if (state.mode === "person") {
+      j = await api("/api/deep/person", { method: "POST", body: { query: q, include_social: $("includeSocial").checked } });
+    } else {
+      j = await api("/api/deep/" + state.mode, { method: "POST", body: { query: q } });
+    }
+    state.lastSearch = j;
+    $("out").textContent = JSON.stringify(j, null, 2);
+    renderSearch(j, Math.round(performance.now() - t0));
+    $("searchStatus").textContent = "completed in " + Math.round(performance.now() - t0) + " ms";
+  } catch (e) {
+    $("out").textContent = JSON.stringify(e.data || { error: e.message }, null, 2);
+    $("searchStatus").textContent = "error: " + e.message;
+    $("searchSummary").innerHTML = "";
+    $("profiles").innerHTML = '<div class="empty red">' + esc(e.message) + "</div>";
+    $("leads").innerHTML = '<div class="empty">No leads.</div>';
+  }
+  btn.disabled = false; btn.textContent = "Search";
+}
+
+function collectSearch(j) {
+  const profiles = [], leads = [];
+  const seenP = new Set(), seenL = new Set();
+  const addP = (h, src, fallback) => {
+    if (!h || h.exists === false) return;
+    const url = h.url || h.html_url || h.final_url || "";
+    const platform = h.platform || src || fallback || "profile";
+    const who = h.name || h.handle || h.username || h.login || h.acct || h.text || h.title || "";
+    const key = (platform + "|" + (url || who)).toLowerCase();
+    if (seenP.has(key) || (!url && !who)) return;
+    seenP.add(key);
+    profiles.push({ platform, who, url, category: h.category || src || "other", confidence: h.confidence || "", note: h.region || "" });
+  };
+  const addL = (name, url, src, detail) => {
+    const key = String(url || name || "").toLowerCase();
+    if (!key || seenL.has(key)) return;
+    seenL.add(key);
+    leads.push({ name: String(name || url || "lead"), url: url || "", source: src || "lead", detail: detail || "" });
+  };
+  const sourceRows = (sources, srcLabel) => {
+    Object.entries(sources || {}).forEach(([src, rows]) => {
+      (rows || []).slice(0, 6).forEach(x => addL(x.name || x.title || x.login || x.handle || x.acct || x.key || src, x.url || x.html_url, srcLabel || src, x.match ? "match " + x.match : ""));
+    });
+  };
+
+  const R = j.results || j;
+  if (R.username?.hits) R.username.hits.forEach(h => addP(h, "profile matrix"));
+  if (R.person?.profiles?.hits) R.person.profiles.hits.forEach(h => addP(h, "profile matrix"));
+  if (R.person?.github?.html_url) addP({ ...R.person.github, platform: "GitHub" }, "github");
+  if (R.person?.verified?.verified) R.person.verified.verified.forEach(h => addP(h, "api verified"));
+  if (R.profiles?.hits) R.profiles.hits.forEach(h => addP(h, "profile matrix"));
+  if (R.verified?.verified) R.verified.verified.forEach(h => addP(h, "api verified"));
+  if (R.github?.html_url) addP({ ...R.github, platform: "GitHub" }, "github");
+  if (j.github?.html_url) addP({ ...j.github, platform: "GitHub" }, "github");
+  if (j.social_links) j.social_links.forEach(h => addP({ platform: h.platform, text: h.text, url: h.url }, "profile links"));
+  if (j.status === "ok" && j.final_url) addP({ platform: j.platform || "profile page", name: j.name || j.title, url: j.final_url }, "profile scraper");
+
+  sourceRows(R.person?.people?.sources, "people index");
+  sourceRows(R.people?.sources, "people index");
+  (R.person?.social?.results || []).forEach(x => addL(x.title || x.url, x.url, "social web · " + (x.platform || "web"), (x.engines || []).join("+")));
+  (R.web?.results || []).forEach(x => addL(x.title || x.url, x.url, "social web · " + (x.platform || "web"), (x.engines || []).join("+")));
+  (R.domain?.subdomains?.sample || []).slice(0, 30).forEach(s => addL(s, "http://" + s, "subdomain"));
+  (R.urlscan?.sample || []).forEach(u => addL(u, u, "urlscan"));
+  (j.social_links || []).forEach(x => addL(x.text || x.url, x.url, "profile link · " + (x.platform || "")));
+  return { profiles, leads };
+}
+
+function renderSearch(j, ms) {
+  const { profiles, leads } = collectSearch(j);
+  state.lastProfiles = profiles;
+  state.profileFilter = "all";
+  const R = j.results || j;
+  const type = j.detected_type || j.query_type || (j.platform ? "profile" : state.mode);
+  const checked = R.username?.checked || R.profiles?.checked || R.person?.profiles?.checked || 0;
+  const peopleTotal = R.person?.people?.total ?? R.people?.total ?? 0;
+  const socialTotal = R.person?.social?.total ?? R.web?.total ?? 0;
+  const blocked = R.person?.social?.status === "blocked" || R.web?.status === "blocked";
+  const stats = [
+    ["type", type],
+    ["profiles", profiles.length],
+    ["leads", leads.length],
+    ["people", peopleTotal],
+    ["social", socialTotal],
+    ["time", ms + " ms"],
+  ];
+  if (checked) stats.splice(2, 0, ["checked", checked]);
+  $("searchSummary").innerHTML = stats.map(([l, v]) => '<div class="stat"><div class="v">' + esc(v) + '</div><div class="l">' + esc(l) + '</div></div>').join("")
+    + (blocked ? '<div class="stat"><div class="v orange">blocked</div><div class="l">social engines</div></div>' : "");
+
+  const cats = [...new Set(profiles.map(p => p.category || "other"))].sort();
+  $("profileFilters").innerHTML = ['all', ...cats].map(c =>
+    '<button class="tab ' + (c === state.profileFilter ? "on" : "") + '" data-cat="' + esc(c) + '">' + esc(c) + (c === "all" ? " · " + profiles.length : " · " + profiles.filter(p => (p.category || "other") === c).length) + "</button>"
+  ).join("");
+  document.querySelectorAll("#profileFilters .tab").forEach(b => b.onclick = () => {
+    state.profileFilter = b.dataset.cat; renderProfiles();
+    document.querySelectorAll("#profileFilters .tab").forEach(x => x.classList.toggle("on", x === b));
+  });
+  renderProfiles();
+  renderLeads(leads);
+}
+
+function renderProfiles() {
+  const list = state.lastProfiles.filter(p => state.profileFilter === "all" || (p.category || "other") === state.profileFilter);
+  if (!list.length) { $("profiles").innerHTML = '<div class="empty">No confirmed public profile hits.</div>'; return; }
+  $("profiles").innerHTML = list.slice(0, 120).map(p => {
+    const inner = '<div class="top"><span class="plat">' + esc(p.platform) + '</span><span class="tag">' + esc(p.category) + "</span></div>"
+      + (p.who ? '<div class="who">' + esc(p.who) + "</div>" : "")
+      + (p.url ? '<div class="url mono">' + esc(p.url) + "</div>" : "");
+    return p.url
+      ? '<a class="hit" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + inner + "</a>"
+      : '<div class="hit">' + inner + "</div>";
+  }).join("");
+}
+
+function renderLeads(leads) {
+  if (!leads.length) { $("leads").innerHTML = '<div class="empty">No people-index or social-web leads.</div>'; return; }
+  $("leads").innerHTML = leads.slice(0, 120).map(l => {
+    const inner = '<div class="top"><span class="plat">' + esc(l.source) + '</span></div>'
+      + '<div class="who">' + esc(l.name) + "</div>"
+      + (l.detail ? '<div class="url">' + esc(l.detail) + "</div>" : "")
+      + (l.url ? '<div class="url mono">' + esc(l.url) + "</div>" : "");
+    return l.url
+      ? '<a class="hit" href="' + esc(l.url) + '" target="_blank" rel="noopener">' + inner + "</a>"
+      : '<div class="hit">' + inner + "</div>";
+  }).join("");
+}
+
+/* ------------------------------------------------------------------ intense */
+$("intenseGo").onclick = runIntense;
+$("intenseTarget").addEventListener("keydown", e => { if (e.key === "Enter") runIntense(); });
+
+async function loadCases() {
+  if (!state.token) return;
+  try {
+    const cases = await api("/api/cases");
+    $("caseSelect").innerHTML = '<option value="">no case</option>' + (cases || []).map(c =>
+      '<option value="' + esc(c.id) + '">' + esc(c.case_number || ("#" + c.id)) + " — " + esc(c.name) + "</option>"
+    ).join("");
+  } catch {}
+}
+
+function intenseSpin(on) {
+  if (state.intenseTimer) { clearInterval(state.intenseTimer); state.intenseTimer = null; }
+  if (!on) { $("intenseBar").style.width = "100%"; return; }
+  state.intenseStart = Date.now();
+  const stages = [
+    "Profile matrix + people indexes…",
+    "Social footprint + email pivots…",
+    "Name variants + sanctions/courts…",
+    "Crawl, Wayback, leaks, netblock, ports…",
+    "Correlating entities and confidence…",
+  ];
+  let i = 0;
+  $("intenseBar").style.width = "8%";
+  $("intenseStatus").innerHTML = '<span class="spinner"></span>' + stages[0];
+  state.intenseTimer = setInterval(() => {
+    const elapsed = ((Date.now() - state.intenseStart) / 1000).toFixed(0);
+    i = (i + 1) % stages.length;
+    $("intenseStatus").innerHTML = '<span class="spinner"></span>' + esc(stages[i]) + ' <span class="muted">· ' + elapsed + "s</span>";
+    $("intenseBar").style.width = Math.min(92, 8 + (Date.now() - state.intenseStart) / 900) + "%";
+  }, 2400);
+}
+
+async function runIntense() {
+  const target = $("intenseTarget").value.trim();
+  if (!target) return;
+  if (!state.token) {
+    $("loginPanel").classList.remove("hidden");
+    $("loginStatus").textContent = "login required for intense recon";
+    return;
+  }
+  const btn = $("intenseGo");
+  btn.disabled = true; btn.textContent = "Running…";
+  $("intenseResult").innerHTML = "";
+  intenseSpin(true);
+  const caseId = $("caseSelect").value ? Number($("caseSelect").value) : null;
+  try {
+    const j = await api("/api/recon/deep", { method: "POST", body: { target, case_id: caseId } });
+    intenseSpin(false);
+    $("intenseStatus").textContent = "completed in " + j.elapsed + "s · axis status: "
+      + Object.entries(j.axis_status || {}).map(([k, v]) => k + "=" + v).join(", ");
+    renderIntense(j);
+  } catch (e) {
+    intenseSpin(false);
+    if (e.status === 401) {
+      state.token = ""; state.user = null;
+      localStorage.removeItem("xaxglog_token"); localStorage.removeItem("xaxglog_user");
+      updateAuthUI();
+    }
+    $("intenseStatus").innerHTML = '<span class="red">error: ' + esc(e.message) + "</span>";
+    $("intenseResult").innerHTML = '<div class="card"><pre>' + esc(JSON.stringify(e.data || { error: e.message }, null, 2)) + "</pre></div>";
+  }
+  btn.disabled = false; btn.textContent = "Run intense recon";
+}
+
+function renderIntense(j) {
+  if (!j || j.error) {
+    $("intenseResult").innerHTML = '<div class="card"><div class="empty red">' + esc(j?.error || "no result") + "</div></div>";
+    return;
+  }
+  const d = j.dossier || {};
+  const c = d.confidence || {};
+  const counts = d.counts || {};
+  const entities = d.entities || [];
+  const axes = j.axes || {};
+  const status = j.axis_status || {};
+  const okAxes = Object.values(status).filter(v => v === "ok" || v === "partial").length;
+  const confidence = pct(c.score);
+  const bandClass = c.band === "high" ? "ok" : (c.band === "medium" ? "warn" : "");
+  const countCards = [
+    ["profiles", counts.profile || 0], ["people", counts.person || 0], ["social", counts.social || 0],
+    ["emails", counts.email || 0], ["domains", counts.domain || 0], ["phones", counts.phone || 0],
+    ["ports", counts.port || 0], ["companies", counts.company || 0], ["officers", counts.officer || 0],
+  ];
+  const axisCards = Object.entries(status).map(([k, v]) => {
+    const cls = (v === "ok" || v === "partial") ? "ok" : (v === "error" ? "err" : "warn");
+    return '<div class="pill ' + cls + '">' + esc(k) + ": " + esc(v) + "</div>";
+  }).join("");
+
+  $("intenseResult").innerHTML = `
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <h3 style="margin:0">${esc(j.target || "")}</h3>
+          <p class="desc" style="margin:4px 0 0">detected type <span class="pill info">${esc(j.detected_type || "?")}</span>
+            · ${esc(j.elapsed)}s · ${okAxes}/${Object.keys(status).length} axes healthy</p>
+        </div>
+        <div class="row">
+          <button class="ghost small" id="copyIntense">Copy JSON</button>
+          <button class="ghost small" id="downloadIntense">Download JSON</button>
+          <span class="statusline" id="intenseCopyStatus"></span>
+        </div>
+      </div>
+      <div class="stats" style="margin-top:14px">
+        <div class="stat"><div class="v"><span class="pill ${bandClass}" style="font-size:15px">${esc((c.band || "low").toUpperCase())}</span></div><div class="l">confidence</div></div>
+        <div class="stat"><div class="v">${confidence}</div><div class="l">score / 100</div></div>
+        <div class="stat"><div class="v">${entities.length}</div><div class="l">entities</div></div>
+        <div class="stat"><div class="v">${okAxes}</div><div class="l">axes healthy</div></div>
+      </div>
+      <div class="progress"><div class="bar" style="width:${confidence}%"></div></div>
+      <div class="row">${(c.reasons || []).map(r => '<span class="badge">' + esc(r) + "</span>").join("")}</div>
+      <div style="margin-top:10px">${axisCards}</div>
+    </div>
+
+    <div class="card">
+      <h3>Dossier counts</h3>
+      <div class="stats">${countCards.map(([l, v]) => '<div class="stat"><div class="v">' + esc(v) + '</div><div class="l">' + esc(l) + "</div></div>").join("")}</div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:10px">
+        <h3 style="margin:0">Entities</h3>
+        <select id="entityFilter"><option value="all">all types</option>${[...new Set(entities.map(e => e.type))].sort().map(t => '<option value="' + esc(t) + '">' + esc(t) + "</option>").join("")}</select>
+      </div>
+      <div class="tablewrap"><table id="entityTable"><thead><tr><th>Type</th><th>Value</th><th>Source</th><th>Confidence</th></tr></thead><tbody>
+        ${entities.length ? entities.map(e => `<tr data-type="${esc(e.type)}"><td><span class="pill">${esc(e.type)}</span></td>
+          <td>${e.url ? '<a href="' + esc(e.url) + '" target="_blank" rel="noopener">' + esc(e.value) + "</a>" : esc(e.value)}</td>
+          <td class="muted">${esc(e.source || "")}</td><td class="muted">${esc(e.confidence || "")}</td></tr>`).join("")
+          : '<tr><td colspan="4" class="empty">No entities emitted.</td></tr>'}
+      </tbody></table></div>
+    </div>
+
+    <div class="card">
+      <h3>Axis detail</h3>
+      ${Object.entries(axes).map(([k, v]) => {
+        const st = status[k] || "";
+        const cls = (st === "ok" || st === "partial") ? "ok" : (st === "error" ? "err" : "warn");
+        return `<details class="axis ${cls}"><summary>${esc(k)} <span class="muted">· ${esc(st)}</span></summary>
+          <pre>${esc(JSON.stringify(v, null, 2))}</pre></details>`;
+      }).join("")}
+    </div>
+
+    <details class="card"><summary>Raw intense-recon response</summary><pre>${esc(JSON.stringify(j, null, 2))}</pre></details>
+  `;
+  $("copyIntense").onclick = () => copyJSON(j, "intenseCopyStatus");
+  $("downloadIntense").onclick = () => downloadJSON(j, "xaxglog-intense-" + String(j.target || "target").replace(/[^a-z0-9._-]+/gi, "_"));
+  const filter = $("entityFilter");
+  if (filter) filter.onchange = () => {
+    const want = filter.value;
+    document.querySelectorAll("#entityTable tbody tr[data-type]").forEach(tr => {
+      tr.style.display = (want === "all" || tr.dataset.type === want) ? "" : "none";
+    });
+  };
+}
+
+/* ------------------------------------------------------------------ sources */
+async function loadSources() {
+  $("sourcesSummary").innerHTML = '<div class="stat"><div class="v"><span class="spinner"></span></div><div class="l">loading catalog</div></div>';
+  try {
+    const s = await api("/api/deep/sources");
+    state.sourcesLoaded = true;
+    $("sourcesSummary").innerHTML = [
+      ["profile platforms", s.profile_platforms || 0],
+      ["people indexes", s.people_indexes || 0],
+      ["categories", Object.keys(s.by_category || {}).length],
+      ["search engines", (s.social_discovery_engines || []).length],
+    ].map(([l, v]) => '<div class="stat"><div class="v">' + esc(v) + '</div><div class="l">' + esc(l) + "</div></div>").join("");
+    $("sourcesCategories").innerHTML = Object.entries(s.by_category || {}).sort().map(([cat, n]) => {
+      const plats = (s.platforms || []).filter(p => p.category === cat);
+      return `<div class="card"><h3>${esc(cat)} <span class="pill">${esc(n)}</span></h3>
+        <div class="row" style="margin-top:10px">${plats.map(p => '<span class="tag" title="' + esc(p.url) + '">' + esc(p.name) + "</span>").join("")}</div></div>`;
+    }).join("");
+    const tbody = document.querySelector("#platformTable tbody");
+    tbody.innerHTML = (s.platforms || []).map(p =>
+      `<tr><td><strong>${esc(p.name)}</strong></td><td><span class="pill">${esc(p.category)}</span></td>
+       <td>${esc(p.region)}</td><td class="mono muted">${esc(p.url)}</td></tr>`).join("");
+  } catch (e) {
+    $("sourcesSummary").innerHTML = '<div class="empty red">' + esc(e.message) + "</div>";
+  }
+}
+
+/* ------------------------------------------------------------------ utils */
+async function copyJSON(obj, statusId) {
+  if (!obj) return;
+  const text = JSON.stringify(obj, null, 2);
+  try {
+    await navigator.clipboard.writeText(text);
+    if (statusId) { $(statusId).textContent = "copied"; setTimeout(() => { if ($(statusId)) $(statusId).textContent = ""; }, 1800); }
+  } catch {
+    if (statusId) $(statusId).textContent = "clipboard unavailable";
+  }
+}
+function downloadJSON(obj, name) {
+  if (!obj) return;
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = (name || "xaxglog") + "-" + new Date().toISOString().replace(/[:.]/g, "-") + ".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+/* ------------------------------------------------------------------ boot */
+api("/api/health").then(j => {
+  const on = Object.entries(j.modules || {}).filter(([, v]) => v).map(([k]) => k);
+  $("health").textContent = "backend ok · " + on.length + " modules";
+  $("health").title = on.join(" + ");
+  $("health").className = "badge ok";
+}).catch(() => { $("health").textContent = "backend unreachable"; $("health").className = "badge err"; });
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+Flask==3.1.3
+flask-cors==6.0.2
+requests==2.33.1
+python-dotenv==1.2.2
+phonenumbers>=8.13
+PyJWT>=2.8
+werkzeug>=3.0
+# Optional — enable extra modules when installed:
+# python-whois==0.9.6
+# cryptography
+# dnspython==2.4.2
+# Pillow==10.1.0
+# ExifRead==3.0.0
+# ipinfo==5.0.0
+# selenium==4.15.2
+# optional satellite pass prediction (location pins / imagery revisit scheduling)
+sgp4>=2.22
+# google-genai groq schedule  (threat-intel AI + collector extras)
