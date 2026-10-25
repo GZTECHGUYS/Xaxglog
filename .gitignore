@@ -1,0 +1,27 @@
+# Node / frontend
+node_modules/
+frontend/build/
+.npm
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Secrets — never commit real env
+.env
+.env.local
+*.pem
+*.key
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Runtime data
+*.log
+data/*.db-wal
+data/*.db-shm

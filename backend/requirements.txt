@@ -1,0 +1,25 @@
+Flask==3.1.3
+flask-cors==6.0.2
+requests==2.33.1
+python-dotenv==1.2.2
+phonenumbers>=8.13
+PyJWT>=2.8
+werkzeug>=3.0
+# ------------------------------------------------------------------
+# Optional. Nothing below is required to boot; modules that need them
+# degrade honestly (CAPS=false in /api/modules + structured 503s).
+# ------------------------------------------------------------------
+# forensics / threat_intel extras:
+#   python-whois==0.9.6      # whois lookups
+#   cryptography             # cert parsing, threat_intel key encryption
+#   dnspython==2.4.2         # DNS record digging
+#   ipinfo==5.0.0            # ip-api/ipinfo enrichment
+# media & capture (imgverify / synthetic / docintel / browserrender):
+#   Pillow==10.1.0           # image hashing + EXIF
+#   ExifRead==3.0.0          # EXIF fallback parser
+#   pycryptodome             # OOXML/PDF structure helpers
+#   selenium==4.15.2         # JS-rendered capture (browserrender)
+# detection (malintel):
+#   yara-python              # local YARA rule scanning (YARA_RULES_DIR)
+# AI narrative assist:
+#   groq / google-genai      # threat-intel AI brief + narrative module

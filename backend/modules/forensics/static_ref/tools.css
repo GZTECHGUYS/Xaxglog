@@ -1,0 +1,125 @@
+body{  background-color: rgb(240, 240, 240);
+}
+html{
+  font-family: 'Segoe UI', sans-serif;
+
+}
+
+#info-container {
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  background-color: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  width: auto;
+  max-width: 100%;
+  margin-bottom: 20px;
+}
+#tools-container {
+  display: flex;
+}
+#tool-column{
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.tool-info {
+  display: inline-block;
+  vertical-align: top;
+  padding: 15px;
+  margin: 10px;
+  font-size: 14px;
+  word-wrap: break-word;
+  line-height: 1.5;
+  max-height: 1000px; 
+  overflow-y: auto; 
+
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+
+#dash-board {
+  display: flex;
+  flex-direction: column;
+}
+
+h2 {
+  font-size: 24px;
+  margin: 1%;
+}
+.info-tag{
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.question-mark {
+  font-size: 24px; /* Adjust the font size as needed */
+  vertical-align: top;
+  float: right;
+  line-height: 20px;
+  cursor: pointer;
+}
+.modal {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 15px;
+  background-color: rgb(240, 240, 240);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  font-size: 14px;
+  word-wrap: break-word;
+  color: black;
+  line-height: 1.5;
+  border-radius: 10px;
+  max-width: 300px;
+  outline: 2px solid black;
+}
+
+.close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  cursor: pointer;
+  color: #004165;
+}
+
+
+
+/* Report.html*/
+
+.section {
+  display: inline-block;
+  vertical-align: top;
+  background-color: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);  padding: 15px;
+  margin: 0 auto;
+  border-radius: 10px;
+  word-wrap: break-word;
+  line-height: 1.5;
+  text-align: left;
+  max-width: 600px;
+  width: 100%;
+  font-size: 14px;
+
+}
+.info-block strong {
+  float: left;
+}
+.info-block p {
+  text-align: right;
+}
+
+#exif-information {
+  text-align: center;
+}

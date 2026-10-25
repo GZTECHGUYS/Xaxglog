@@ -1,0 +1,2098 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Xaxglog — OSINT Console</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#070b12;--panel:#0e1522;--panel2:#121c2d;--line:#223047;
+  --text:#e6edf3;--muted:#8b98a9;--accent:#58a6ff;--blue:#1f6feb;
+  --green:#3fb950;--orange:#e67e22;--red:#e74c3c;--purple:#8957e5;--yellow:#d29922;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:radial-gradient(1100px 500px at 15% -10%,#13233c 0%,var(--bg) 55%) no-repeat,var(--bg);
+  color:var(--text);font:14px/1.55 system-ui,Segoe UI,Roboto,sans-serif}
+header{position:sticky;top:0;z-index:30;display:flex;gap:18px;align-items:center;justify-content:space-between;
+  padding:16px 26px;border-bottom:1px solid var(--line);background:rgba(9,14,23,.88);backdrop-filter:blur(14px)}
+.brand{display:flex;gap:12px;align-items:center;min-width:0}
+.logo{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-weight:800;font-size:19px;
+  color:#fff;background:linear-gradient(135deg,#1f6feb,#8957e5);box-shadow:0 0 20px rgba(31,111,235,.35)}
+h1{margin:0;font-size:18px;letter-spacing:.4px;white-space:nowrap}h1 span{color:var(--accent);font-weight:500}
+.sub{color:var(--muted);font-size:12px;margin-top:2px}
+.auth{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+main{max-width:1320px;margin:0 auto;padding:22px 24px 40px}
+.legal{margin-top:18px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:rgba(14,21,34,.6);
+  color:var(--muted);font-size:12px}
+footer{color:var(--muted);font-size:12px;padding:18px;text-align:center;border-top:1px solid var(--line)}
+.nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.nav button{background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:9px 16px;border-radius:999px;
+  cursor:pointer;font-weight:600;font-size:13px}
+.nav button.on{background:linear-gradient(135deg,#1f6feb,#2d8cff);border-color:#2d8cff;color:#fff}
+.view{display:none}.view.on{display:block}
+.card{background:linear-gradient(180deg,rgba(18,28,45,.92),rgba(14,21,34,.92));border:1px solid var(--line);
+  border-radius:12px;padding:18px;margin-bottom:16px}
+.card h2,.card h3{margin:0 0 4px;font-size:16px;color:var(--text)}
+.card p.desc{margin:0 0 14px;color:var(--muted);font-size:12px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input,select,button,textarea{font:inherit}
+input,select,textarea{border-radius:8px;border:1px solid #2a3a52;background:#0b1220;color:var(--text);padding:10px 12px;font-size:13px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(31,111,235,.15)}
+input[type=checkbox]{width:auto;min-width:0;accent-color:var(--blue)}
+.searchbar{display:flex;gap:10px;flex-wrap:wrap}
+.searchbar input{flex:1;min-width:260px;font-size:15px;padding:13px 15px}
+button{border-radius:8px;border:1px solid var(--blue);background:var(--blue);color:#fff;padding:10px 15px;
+  cursor:pointer;font-weight:650;font-size:13px;white-space:nowrap}
+button:hover{filter:brightness(1.1)}button:disabled{opacity:.55;cursor:wait}
+button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
+button.green{background:#238636;border-color:#2ea043}button.orange{background:#b35c00;border-color:var(--orange)}
+button.small{padding:5px 9px;font-size:11px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+.tab{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:#0b1220;color:var(--muted);
+  cursor:pointer;font-size:12px}
+.tab.on{background:#1a2b45;border-color:#3b82f6;color:#fff}
+.badge,.pill,.tag{display:inline-flex;align-items:center;gap:5px;border-radius:999px;font-size:11px;padding:3px 9px;
+  border:1px solid var(--line);background:#121c2d;color:var(--muted);margin:0 4px 4px 0}
+.pill.ok,.badge.ok{color:#7ee787;border-color:#2ea043;background:rgba(46,160,67,.12)}
+.pill.err,.badge.err{color:#ff7b72;border-color:#da3633;background:rgba(218,54,51,.12)}
+.pill.warn,.badge.warn{color:#e3b341;border-color:#9e6a03;background:rgba(158,106,3,.14)}
+.pill.info,.badge.info{color:#79c0ff;border-color:#1f6feb;background:rgba(31,111,235,.14)}
+.pill.purple{color:#d2a8ff;border-color:#8957e5;background:rgba(137,87,229,.14)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px;margin:12px 0 4px}
+.stat{background:#0b1220;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.stat .v{font-size:21px;font-weight:750;color:var(--text);line-height:1.2}
+.stat .l{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-top:3px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px}
+.cardlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.hit{display:block;background:#0b1220;border:1px solid var(--line);border-radius:9px;padding:11px 12px;
+  text-decoration:none;color:var(--text);transition:border-color .15s,transform .15s;min-width:0}
+.hit:hover{border-color:#3b82f6;transform:translateY(-1px)}
+.hit .top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hit .plat{font-weight:700;font-size:12.5px;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hit .who{color:var(--text);font-size:12px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hit .url{color:var(--muted);font-size:10.5px;margin-top:4px;word-break:break-all;max-height:2.6em;overflow:hidden}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+pre{background:#060a11;border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto;max-height:560px;
+  font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+details{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#0b1220;margin-bottom:10px}
+summary{cursor:pointer;font-weight:650;color:var(--accent);font-size:12.5px}
+.axis{border-left:3px solid var(--blue)}
+.axis.ok{border-left-color:var(--green)}.axis.err{border-left-color:var(--red)}.axis.warn{border-left-color:var(--orange)}
+.statusline{color:var(--muted);font-size:12px;min-height:20px;margin-top:10px}
+.progress{height:7px;background:#0b1220;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin:12px 0 8px}
+.progress .bar{height:100%;width:0;background:linear-gradient(90deg,#1f6feb,#8957e5,#2ea043);transition:width .4s}
+.spinner{width:18px;height:18px;border:2px solid #2a3a52;border-top-color:var(--accent);border-radius:50%;
+  display:inline-block;animation:spin .9s linear infinite;vertical-align:-3px;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{position:sticky;top:0;background:#121c2d;color:var(--muted);text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);font-weight:650}
+td{padding:8px 10px;border-bottom:1px solid #172234;vertical-align:top}
+tr:last-child td{border-bottom:none}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+.muted{color:var(--muted)}.green{color:var(--green)}.red{color:var(--red)}.orange{color:var(--orange)}
+.hidden{display:none!important}
+.empty{color:var(--muted);font-size:12px;padding:10px 0}
+.loginbox{display:grid;grid-template-columns:1fr 1fr auto auto;gap:8px;align-items:end}
+.loginbox label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:3px}
+@media(max-width:720px){
+  header{align-items:flex-start;flex-direction:column;padding:14px 16px}
+  main{padding:16px 14px 30px}.loginbox{grid-template-columns:1fr 1fr}
+  .grid2{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">X</div>
+    <div>
+      <h1>XAXGLOG <span>// OSINT CONSOLE</span></h1>
+      <div class="sub">International deep search · social media · image reverse · country scope · pattern graph · public records · intense recon</div>
+    </div>
+  </div>
+  <div class="auth">
+    <span class="badge" id="health">checking backend…</span>
+    <span class="badge" id="authState">guest</span>
+    <button class="ghost small" id="loginToggle">Login</button>
+    <button class="ghost small hidden" id="logoutBtn">Logout</button>
+  </div>
+</header>
+
+<main>
+  <nav class="nav">
+    <button data-view="search" class="on">Search</button>
+    <button data-view="identity">Identity</button>
+    <button data-view="social">Social Media</button>
+    <button data-view="imagerev">Image Reverse</button>
+    <button data-view="country">Country Scope</button>
+    <button data-view="intense">Intense Recon</button>
+    <button data-view="trackpin">TrackPin</button>
+    <button data-view="pattern">Pattern</button>
+    <button data-view="broker">Broker</button>
+    <button data-view="records">Records</button>
+    <button data-view="sources">Sources</button>
+  </nav>
+
+  <div id="loginPanel" class="card hidden">
+    <h3>Operator login</h3>
+    <p class="desc">JWT login unlocks intense recon, case attachment and the case entity graph. Deep search and profile lookup remain available as guest.</p>
+    <div class="loginbox">
+      <div><label for="username">Username</label><input id="username" autocomplete="username" placeholder="admin"/></div>
+      <div><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" placeholder="••••••••"/></div>
+      <button id="loginBtn">Sign in</button>
+      <span class="statusline" id="loginStatus"></span>
+    </div>
+  </div>
+
+  <!-- ============================================================ SEARCH -->
+  <section class="view on" id="view-search">
+    <div class="card">
+      <h2>Deep search</h2>
+      <p class="desc">Auto-detects names, handles, emails, phones, domains, IPs and companies. Name searches combine 90+ handle checks with display-name APIs, 15 people indexes, academic author indexes and public social discovery.</p>
+      <div class="searchbar">
+        <input id="q" placeholder="e.g. Jane Doe / jane_doe / jane@example.com / example.com / +1 202-555-0143 / https://x.com/jane"/>
+        <button id="go">Search</button>
+      </div>
+      <div class="tabs" id="modes">
+        <button class="tab on" data-t="auto">Auto-detect</button>
+        <button class="tab" data-t="username">Username</button>
+        <button class="tab" data-t="email">Email</button>
+        <button class="tab" data-t="phone">Phone</button>
+        <button class="tab" data-t="domain">Domain</button>
+        <button class="tab" data-t="ip">IP</button>
+        <button class="tab" data-t="person">Person</button>
+        <button class="tab" data-t="social">Social</button>
+        <button class="tab" data-t="location">Location</button>
+        <button class="tab" data-t="profile">Profile URL</button>
+        <button class="tab" data-t="company">Company</button>
+        <button class="tab" data-t="geo">Place</button>
+      </div>
+      <div class="row">
+        <label class="badge"><input type="checkbox" id="includeSocial" checked/> social web discovery</label>
+        <label class="badge">depth
+          <select id="searchDepth"><option value="quick">quick</option><option value="standard" selected>standard</option><option value="deep">deep</option></select>
+        </label>
+        <label class="badge"><input type="checkbox" id="includeRecords" checked/> public records</label>
+        <label class="badge"><input type="checkbox" id="includeCode"/> code indexes</label>
+        <span class="statusline" id="searchStatus"></span>
+      </div>
+    </div>
+
+    <div class="stats" id="searchSummary"></div>
+
+    <div class="card hidden" id="coverageCard">
+      <h3>Platform coverage</h3>
+      <div id="coverageBody"></div>
+    </div>
+
+    <div class="card hidden" id="locationCard">
+      <h3>Location signals</h3>
+      <p class="desc">Precision-labelled public signals only. A phone/email/profile is not GPS; precise location requires consent or a lawful authority request.</p>
+      <div class="grid" id="locationSignals"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h3>Profiles</h3>
+        <p class="desc">Exact public profile hits across the platform matrix.</p>
+        <div class="tabs" id="profileFilters"></div>
+        <div class="cardlist" id="profiles"><div class="empty">Run a search to populate profiles.</div></div>
+      </div>
+      <div class="card">
+        <h3>Leads</h3>
+        <p class="desc">People-index matches, social discovery results, subdomains and extracted pivots.</p>
+        <div class="cardlist" id="leads"><div class="empty">Run a search to populate leads.</div></div>
+      </div>
+    </div>
+
+    <details class="card">
+      <summary>Raw response</summary>
+      <div class="row" style="margin:10px 0">
+        <button class="ghost small" id="copySearch">Copy JSON</button>
+        <button class="ghost small" id="downloadSearch">Download JSON</button>
+        <span class="statusline" id="searchCopyStatus"></span>
+      </div>
+      <pre id="out">Run a search above.</pre>
+    </details>
+  </section>
+
+  <!-- ============================================================ IDENTITY -->
+  <section class="view" id="view-identity">
+    <div class="card">
+      <h2>Identity intelligence <span class="pill purple">always-on variants</span></h2>
+      <p class="desc">Normalizes comma forms, suffixes and initials; runs the exact name <em>and</em> prioritized variants across people indexes, academic/archive APIs, code indexes, public records and a general web pass. Every source is reported as ok, empty, blocked, link-out, optional-key or not checked — blocked is never counted as “no results”.</p>
+      <div class="searchbar">
+        <input id="identityQuery" placeholder="e.g. Doe, Jane A. Jr. / Jane Doe / jane_doe"/>
+        <button id="identityGo">Run identity search</button>
+      </div>
+      <div class="row" style="align-items:flex-end">
+        <div><label class="badge">depth</label><select id="identityDepth"><option value="quick">quick</option><option value="standard" selected>standard</option><option value="deep">deep</option></select></div>
+        <div><label class="badge">country</label><input id="identityCountry" placeholder="US / GB / EU / all" style="width:110px"/></div>
+        <label class="badge"><input type="checkbox" id="identitySocial" checked/> social</label>
+        <label class="badge"><input type="checkbox" id="identityWeb" checked/> web</label>
+        <label class="badge"><input type="checkbox" id="identityRecords" checked/> records</label>
+        <label class="badge"><input type="checkbox" id="identityCode"/> code</label>
+        <label class="badge"><input type="checkbox" id="identityLinks" checked/> link-outs</label>
+        <button class="ghost small" id="identityPlanBtn">Plan sources</button>
+        <button class="ghost small" id="identityVariantBtn">Show variants</button>
+        <span class="statusline" id="identityStatus"></span>
+      </div>
+    </div>
+
+    <div class="stats" id="identitySummary"></div>
+
+    <div class="grid2">
+      <div class="card">
+        <h3>Normalized name & variants</h3>
+        <div id="identityNormalized"><div class="empty">Run a search or show variants.</div></div>
+      </div>
+      <div class="card">
+        <h3>Coverage diagnostics</h3>
+        <div id="identityCoverage"><div class="empty">Coverage appears after a search.</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Merged leads <span class="pill" id="identityResultCount">0</span></h3>
+      <p class="desc">Deduplicated by public URL, then ranked by name/URL match. “High” is a strong match, not proof of identity.</p>
+      <div class="tablewrap"><table id="identityResults"><thead><tr><th>Confidence</th><th>Source</th><th>Name</th><th>Detail</th><th>URL</th></tr></thead><tbody><tr><td colspan="5" class="empty">Run an identity search.</td></tr></tbody></table></div>
+    </div>
+
+    <div class="card">
+      <h3>Public link-outs <span class="pill" id="identityLinkCount">0</span></h3>
+      <p class="desc">Reliable public search/profile pages. These are analyst links, never automatic hits. Login walls and captchas are not bypassed.</p>
+      <div id="identityLinks"><div class="empty">Link-outs appear after a search.</div></div>
+    </div>
+
+    <details class="card">
+      <summary>Raw identity response</summary>
+      <div class="row" style="margin:10px 0">
+        <button class="ghost small" id="copyIdentity">Copy JSON</button>
+        <button class="ghost small" id="downloadIdentity">Download JSON</button>
+        <span class="statusline" id="identityCopyStatus"></span>
+      </div>
+      <pre id="identityRaw">Run a search above.</pre>
+    </details>
+  </section>
+
+  <!-- ============================================================ SOCIAL -->
+  <section class="view" id="view-social">
+    <div class="card">
+      <h2>Social Media Search <span class="pill purple">international public sources</span></h2>
+      <p class="desc">Search a name, handle, hashtag, keyword or public post URL across a 168-platform international catalog. Runs federated public search, regional engines (Baidu/Yandex/Weibo/Telegram), keyless Reddit/Bluesky/Lemmy APIs, and builds platform-native search links. Public pages and APIs only — login walls, private groups and captchas are reported as blocked, never bypassed.</p>
+      <div id="socialAuthHint" class="statusline">Login required for social search — use the Login button above.</div>
+      <div class="row" style="align-items:flex-end;margin-top:12px">
+        <div style="flex:2;min-width:240px"><label class="badge">query</label><input id="socialQuery" placeholder="Jane Doe / jane_doe / #osint / https://x.com/jane/status/123"/></div>
+        <div><label class="badge">region</label><select id="socialRegion"><option value="all">all regions</option></select></div>
+        <div><label class="badge">category</label><select id="socialCategory"><option value="all">all categories</option></select></div>
+        <div style="flex:1;min-width:180px"><label class="badge">platforms (optional)</label><input id="socialPlatforms" placeholder="X/Twitter, Weibo, Pixiv"/></div>
+        <div><label class="badge">case</label><select id="socialCase"><option value="">no case</option></select></div>
+        <button class="purple" id="socialGo" style="background:#8957e5;border-color:#8957e5">Search social</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label class="badge"><input type="checkbox" id="socialScrape"/> scrape top public pages</label>
+        <label class="badge"><input type="checkbox" id="socialProbe"/> probe exact handle profiles</label>
+        <span class="statusline" id="socialStatus"></span>
+      </div>
+    </div>
+    <div class="stats" id="socialSummary"></div>
+    <div class="grid2">
+      <div class="card">
+        <h3>Public results</h3>
+        <p class="desc">Search-engine hits, public API posts and scraped page metadata. A match is a lead, not identity proof.</p>
+        <div class="cardlist" id="socialResults"><div class="empty">Run a social search.</div></div>
+      </div>
+      <div class="card">
+        <h3>Platform search links</h3>
+        <p class="desc">Open the platform's own public search UI for the rest of the catalog.</p>
+        <div class="cardlist" id="socialLinks"><div class="empty">Search links appear here.</div></div>
+      </div>
+    </div>
+    <details class="card">
+      <summary>Raw social response</summary>
+      <pre id="socialOut">No search yet.</pre>
+    </details>
+  </section>
+
+  <!-- ============================================================ IMAGE REVERSE -->
+  <section class="view" id="view-imagerev">
+    <div class="card">
+      <h2>Image Reverse Lookup <span class="pill">links + keyless APIs</span></h2>
+      <p class="desc">Use 14 public reverse-image engines (11 link-out: Google Lens, Bing, Yandex, TinEye, SauceNAO, IQDB, ascii2d, Baidu, Sogou, Karma Decay, Trace.moe), and run keyless Trace.moe plus optional keyed APIs. Face-search/biometric engines are excluded. Hits are provenance leads, not identity proof.</p>
+      <div id="imgrevAuthHint" class="statusline">Login required for reverse-image lookup — use the Login button above.</div>
+      <div class="row" style="align-items:flex-end;margin-top:12px">
+        <div style="flex:2;min-width:260px"><label class="badge">public image URL</label><input id="imgrevUrl" placeholder="https://example.com/photo.jpg"/></div>
+        <div style="flex:1;min-width:200px"><label class="badge">server-local path (optional)</label><input id="imgrevPath" placeholder="/path/to/image.jpg"/></div>
+        <div><label class="badge">case</label><select id="imgrevCase"><option value="">no case</option></select></div>
+        <button class="orange" id="imgrevGo">Lookup image</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label class="badge"><input type="checkbox" id="imgrevApi" checked/> run API engines</label>
+        <span class="statusline" id="imgrevStatus"></span>
+      </div>
+    </div>
+    <div class="stats" id="imgrevSummary"></div>
+    <div class="grid2">
+      <div class="card">
+        <h3>Engine links</h3>
+        <div class="cardlist" id="imgrevLinks"><div class="empty">Links appear here.</div></div>
+      </div>
+      <div class="card">
+        <h3>API hits</h3>
+        <div class="cardlist" id="imgrevHits"><div class="empty">Run a lookup to query keyless/optional-key APIs.</div></div>
+      </div>
+    </div>
+    <details class="card">
+      <summary>Raw reverse-image response</summary>
+      <pre id="imgrevOut">No lookup yet.</pre>
+    </details>
+  </section>
+
+  <!-- ============================================================ COUNTRY -->
+  <section class="view" id="view-country">
+    <div class="card">
+      <h2>Country Scope <span class="pill purple">country-specific search</span></h2>
+      <p class="desc">Enter a name, company, domain, IP, phone or email and choose a country. The console builds a country-specific source plan (official registry, procurement, courts, charities, search engines) and runs free live checks where available: GLEIF jurisdiction, USAspending/TED, US nonprofit/lobbying, and server/IP country. A country match is a lead, not identity proof.</p>
+      <div id="countryAuthHint" class="statusline">Login required for country scope — use the Login button above.</div>
+      <div class="row" style="align-items:flex-end;margin-top:12px">
+        <div style="flex:2;min-width:260px"><label class="badge">target</label><input id="countryQuery" placeholder="Jane Doe / Acme Ltd / example.de / 8.8.8.8 / +49 30 123456 / jane@example.com"/></div>
+        <div style="flex:1;min-width:190px"><label class="badge">country</label><select id="countrySelect"><option value="auto">Auto-detect / choose country</option></select></div>
+        <div><label class="badge">case</label><select id="countryCase"><option value="">no case</option></select></div>
+        <button class="orange" id="countryGo">Scope target</button>
+      </div>
+      <div class="statusline" id="countryStatus"></div>
+    </div>
+    <div class="stats" id="countrySummary"></div>
+    <div class="grid2">
+      <div class="card">
+        <h3>Scope signals</h3>
+        <p class="desc">Precision-labelled country leads from registries, procurement, profiles and infrastructure. No signal is a residence determination.</p>
+        <div class="cardlist" id="countrySignals"><div class="empty">Run a country scope query.</div></div>
+      </div>
+      <div class="card">
+        <h3>Country sources</h3>
+        <p class="desc">Official portals and country-scoped search links for the selected jurisdiction.</p>
+        <div class="cardlist" id="countrySources"><div class="empty">Source links appear here.</div></div>
+      </div>
+    </div>
+    <details class="card">
+      <summary>Raw country scope response</summary>
+      <pre id="countryOut">No query yet.</pre>
+    </details>
+  </section>
+
+  <!-- ============================================================ INTENSE -->
+  <section class="view" id="view-intense">
+    <div class="card">
+      <h2>Intense recon</h2>
+      <p class="desc">Target-aware multi-axis investigation: identity fan-out, social footprint, people indexes, name variants, sanctions/courts, corporate ownership, crawl, Wayback, leak search, netblock and ports. Attach a case to emit entities, edges and hashed evidence.</p>
+      <div class="row">
+        <input id="intenseTarget" style="flex:1;min-width:260px;font-size:15px;padding:13px 15px" placeholder="target — Jane Doe / jane@example.com / example.com / 8.8.8.8 / Acme Ltd"/>
+        <select id="caseSelect" title="Optional case attachment"><option value="">no case</option></select>
+        <button class="orange" id="intenseGo">Run intense recon</button>
+      </div>
+      <div id="intenseAuthHint" class="statusline">Login required for intense recon — use the Login button above.</div>
+      <div class="progress"><div class="bar" id="intenseBar"></div></div>
+      <div class="statusline" id="intenseStatus"></div>
+    </div>
+    <div id="intenseResult"></div>
+  </section>
+
+  <!-- ============================================================ TRACKPIN -->
+  <section class="view" id="view-trackpin">
+    <div class="card">
+      <h2>TrackPin <span class="pill purple">lawful location workflow</span></h2>
+      <p class="desc">One-time consent check-in links and authority-gated carrier request packets. TrackPin does <strong>not</strong> intercept calls/SMS, exploit SS7, or silently track a device. Precise location is collected only when the subject explicitly consents in their own browser, or through a valid legal process handled by the provider.</p>
+      <div id="tpAuthHint" class="statusline">Login required — use the Login button above.</div>
+      <div class="row" style="align-items:flex-end;margin-top:12px">
+        <div style="flex:1;min-width:180px"><label class="badge">label</label><input id="tpLabel" placeholder="Operation label"/></div>
+        <div style="flex:1;min-width:180px"><label class="badge">target</label><input id="tpTarget" placeholder="phone / email / name / device ref"/></div>
+        <div><label class="badge">mode</label><select id="tpMode"><option value="consent_checkin">consent check-in</option><option value="authority_request">authority request</option><option value="manual_ingest">manual ingest</option></select></div>
+        <div><label class="badge">case</label><select id="tpCase"><option value="">no case</option></select></div>
+        <div style="flex:1;min-width:180px"><label class="badge">legal basis / authority ref</label><input id="tpLegal" placeholder="required for authority mode"/></div>
+        <button class="purple" id="tpCreateBtn" style="background:#8957e5;border-color:#8957e5">Create operation</button>
+      </div>
+      <div class="statusline" id="tpCreateStatus"></div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:8px">
+        <h3 style="margin:0">Operations</h3>
+        <button class="ghost small" id="tpRefresh">Refresh</button>
+      </div>
+      <div class="tablewrap"><table id="tpOperations"><thead><tr><th>ID</th><th>Label</th><th>Target</th><th>Mode</th><th>Status</th><th>Points</th><th>Created</th><th></th></tr></thead><tbody><tr><td colspan="8" class="empty">Login and create an operation.</td></tr></tbody></table></div>
+    </div>
+
+    <div class="card hidden" id="tpDetail">
+      <div class="row" style="justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div><h3 id="tpTitle" style="margin:0"></h3><div class="statusline" id="tpMeta"></div></div>
+        <div class="row">
+          <button class="ghost small" id="tpConsentBtn">New consent link</button>
+          <button class="ghost small" id="tpGeoBtn">GeoJSON</button>
+          <button class="ghost small" id="tpCloseBtn">Close detail</button>
+        </div>
+      </div>
+      <div id="tpConsentBox"></div>
+      <div class="row" style="align-items:flex-end;margin-top:12px">
+        <div><label class="badge">lat</label><input id="tpLat" placeholder="37.7749" style="width:110px"/></div>
+        <div><label class="badge">lon</label><input id="tpLon" placeholder="-122.4194" style="width:110px"/></div>
+        <div><label class="badge">accuracy m</label><input id="tpAcc" placeholder="25" style="width:100px"/></div>
+        <div><label class="badge">source</label><select id="tpSource"><option value="manual">manual</option><option value="open_source">open_source</option><option value="authority">authority</option></select></div>
+        <div style="flex:1;min-width:160px"><label class="badge">note</label><input id="tpNote" placeholder="provenance / note"/></div>
+        <button class="green" id="tpAddPointBtn">Add point</button>
+      </div>
+      <div class="statusline" id="tpStatus"></div>
+      <div id="tpAuthorityBox"></div>
+      <div class="tablewrap" style="margin-top:12px"><table id="tpPoints"><thead><tr><th>#</th><th>Captured</th><th>Lat, Lon</th><th>Accuracy</th><th>Source</th><th>Consent</th><th>Map</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- ============================================================ PATTERN -->
+  <section class="view" id="view-pattern">
+    <div class="card">
+      <h2>Pattern Tracker <span class="pill purple">public interaction graph</span></h2>
+      <p class="desc">Build a case-linked contact graph from public posts, mentions, follows, shared URLs and operator-supplied email headers. It does not access private messages or browsing history; every row carries its public source.</p>
+      <div id="patternAuthHint" class="statusline">Login required for pattern collection — use the Login button above.</div>
+      <div class="row" style="align-items:flex-end;margin-top:12px">
+        <div style="flex:1;min-width:220px"><label class="badge">entity</label><input id="patternEntity" placeholder="handle / person / email / org"/></div>
+        <div><label class="badge">case</label><select id="patternCase"><option value="">no case</option></select></div>
+        <div style="flex:1;min-width:220px"><label class="badge">platforms (comma-separated)</label><input id="patternPlatforms" placeholder="github,bluesky,mastodon,gdelt,telegram"/></div>
+        <button class="purple" id="patternCollect" style="background:#8957e5;border-color:#8957e5">Collect public interactions</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" id="patternPnl">Pattern of life</button>
+        <button class="ghost" id="patternContacts">Frequent contacts</button>
+        <button class="ghost" id="patternIps">URL + IP ledgers</button>
+        <span class="statusline" id="patternStatus"></span>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h3>Pattern of life</h3><pre id="patternOut">Collect an entity, then run a pattern-of-life view.</pre></div>
+      <div class="card"><h3>Contacts / ledgers</h3><pre id="patternSide">Frequent-contact ranking and URL/IP ledgers appear here.</pre></div>
+    </div>
+    <div class="card">
+      <h3>Email thread graph</h3>
+      <p class="desc">Paste raw RFC-822 headers (one or many). Threads are reconstructed from Message-ID / In-Reply-To / References; auto-responders are flagged. Headers supplied here stay in the case evidence store.</p>
+      <textarea id="patternHeaders" rows="7" style="width:100%" placeholder="Message-ID: <a@example.com>&#10;From: Alice <alice@example.com>&#10;To: Bob <bob@example.com>&#10;Subject: Hello&#10;Date: Mon, 20 Oct 2026 10:00:00 +0000"></textarea>
+      <div class="row" style="margin-top:10px"><button class="ghost" id="patternEmail">Analyze headers</button><span class="statusline" id="patternEmailStatus"></span></div>
+      <pre id="patternEmailOut" style="margin-top:12px">No headers analyzed.</pre>
+    </div>
+  </section>
+
+  <!-- ============================================================ BROKER -->
+  <section class="view" id="view-broker">
+    <div class="card">
+      <h2>Broker Exposure <span class="pill">public people-search</span></h2>
+      <p class="desc">Checks a curated public people-search catalog for a name or address. A blocked site is treated as <strong>unknown</strong>, not clean. Sequential rate-limited checks only — no login walls or captcha bypass.</p>
+      <div id="brokerAuthHint" class="statusline">Login required for broker sweeps — use the Login button above.</div>
+      <div class="row" style="align-items:flex-end;margin-top:12px">
+        <div style="flex:1;min-width:220px"><label class="badge">name</label><input id="brokerName" placeholder="Jane Doe"/></div>
+        <div style="flex:1;min-width:220px"><label class="badge">address (optional)</label><input id="brokerAddress" placeholder="street, city, region"/></div>
+        <div><label class="badge">mode</label><select id="brokerMode"><option value="name">name</option><option value="address">address</option></select></div>
+        <button class="orange" id="brokerSweep">Sweep brokers</button>
+      </div>
+      <div class="statusline" id="brokerStatus"></div>
+    </div>
+    <div class="stats" id="brokerSummary"></div>
+    <div class="tablewrap"><table id="brokerTable"><thead><tr><th>Broker</th><th>Status</th><th>Evidence</th><th>HTTP</th><th>URL</th></tr></thead><tbody><tr><td colspan="5" class="empty">Run a sweep to check public exposure.</td></tr></tbody></table></div>
+    <details class="card"><summary>Raw broker response</summary><pre id="brokerOut">No sweep yet.</pre></details>
+  </section>
+
+  <!-- ============================================================ RECORDS -->
+  <section class="view" id="view-records">
+    <div class="card">
+      <h2>Public Records <span class="pill purple">official transparency sources</span></h2>
+      <p class="desc">Procurement awards, lobbying disclosures, and IRS nonprofit filings from free public portals. Results are leads for due diligence, not findings of wrongdoing.</p>
+      <div id="recordsAuthHint" class="statusline">Login required for public-records queries — use the Login button above.</div>
+      <div class="row" style="margin-top:12px">
+        <div><label class="badge">case attachment (optional)</label><select id="recordsCase"><option value="">no case</option></select></div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h3>Procurement awards</h3>
+        <p class="desc">US federal contract awards via USAspending and EU notices via TED.</p>
+        <div class="row">
+          <input id="procQuery" style="flex:1;min-width:180px" placeholder="recipient / keyword"/>
+          <select id="procCountry"><option value="all">US + EU</option><option value="us">US</option><option value="eu">EU</option></select>
+          <button class="orange" id="procGo">Search awards</button>
+        </div>
+        <div class="statusline" id="procStatus"></div>
+        <pre id="procOut" style="margin-top:12px">No procurement search yet.</pre>
+      </div>
+      <div class="card">
+        <h3>Lobbying disclosures</h3>
+        <p class="desc">US LDA (lda.gov) filings by client or registrant, including lobbyists and issues.</p>
+        <div class="row">
+          <input id="lobQuery" style="flex:1;min-width:180px" placeholder="client or registrant"/>
+          <input id="lobYear" style="width:110px" placeholder="year" inputmode="numeric"/>
+          <button class="orange" id="lobGo">Search filings</button>
+        </div>
+        <div class="statusline" id="lobStatus"></div>
+        <pre id="lobOut" style="margin-top:12px">No lobbying search yet.</pre>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h3>Nonprofit search</h3>
+        <p class="desc">IRS-registered nonprofits via ProPublica Nonprofit Explorer, with optional state filter.</p>
+        <div class="row">
+          <input id="npQuery" style="flex:1;min-width:180px" placeholder="organization name"/>
+          <input id="npState" style="width:90px" placeholder="state" maxlength="2"/>
+          <button class="orange" id="npGo">Search nonprofits</button>
+        </div>
+        <div class="statusline" id="npStatus"></div>
+        <pre id="npOut" style="margin-top:12px">No nonprofit search yet.</pre>
+      </div>
+      <div class="card">
+        <h3>Nonprofit EIN lookup</h3>
+        <p class="desc">Fetch one organization and recent Form 990 summaries by 9-digit EIN.</p>
+        <div class="row">
+          <input id="npEin" style="flex:1;min-width:180px" placeholder="12-3456789"/>
+          <button class="orange" id="npEinGo">Lookup EIN</button>
+        </div>
+        <div class="statusline" id="npEinStatus"></div>
+        <pre id="npOrgOut" style="margin-top:12px">No EIN lookup yet.</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ SOURCES -->
+  <section class="view" id="view-sources">
+    <div class="card">
+      <h2>Unified source registry <span class="pill purple">public sources only</span></h2>
+      <p class="desc">One catalog for verified/keyless APIs, public HTML scrapers, optional-key APIs, link-out engines and known-blocked sources. Verified means live-checked; adapter means code exists but a live check is still recommended. Link-out and blocked sources are never counted as automatic hits.</p>
+      <div class="stats" id="sourcesSummary"></div>
+      <div class="row" style="margin-top:12px;align-items:flex-end">
+        <div style="flex:2;min-width:240px"><label class="badge">public link-out query</label><input id="sourceLinkQuery" placeholder="Jane Doe / example.com / jane_doe"/></div>
+        <div><label class="badge">category</label><select id="sourceLinkCategory"><option value="">all</option></select></div>
+        <button class="orange" id="sourceLinkGo">Build links</button>
+        <span class="statusline" id="sourceLinkStatus"></span>
+      </div>
+      <div id="sourceLinks" style="margin-top:12px"></div>
+    </div>
+    <div class="grid" id="sourcesCategories"></div>
+    <details class="card">
+      <summary>Full registry table</summary>
+      <div class="tablewrap" style="margin-top:12px"><table id="platformTable"><thead><tr><th>Source</th><th>Category</th><th>Access</th><th>Status</th><th>Adapter</th><th>Region</th><th>Key</th><th>Public URL</th></tr></thead><tbody></tbody></table></div>
+    </details>
+  </section>
+
+  <div class="legal"><strong>Legal note:</strong> Xaxglog queries public/free OSINT sources only — including public profile pages, never login walls. No classified or paywalled law-enforcement databases. Obtain authorization before investigating identifiable individuals; respect GDPR/privacy law, robots/rate limits and each source's ToS. Name matches and profile existence are leads, not identity proof.</div>
+</main>
+
+<footer>Xaxglog · unified OSINT (threat-intel + forensics + runner + catalog + deep-search + social media + image reverse + country scope + pattern + broker + public records + intense recon)</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pct = n => Math.max(0, Math.min(100, Number(n) || 0));
+
+const state = {
+  view: "search",
+  mode: "auto",
+  token: localStorage.getItem("xaxglog_token") || "",
+  user: null,
+  lastSearch: null,
+  lastProfiles: [],
+  profileFilter: "all",
+  sourcesLoaded: false,
+  socialCatalogLoaded: false,
+  imgrevCatalogLoaded: false,
+  imgrevLabels: {},
+  countriesLoaded: false,
+  intenseTimer: null,
+  intenseStart: 0,
+  trackpinCurrent: null,
+  trackpinOps: [],
+};
+
+/* ------------------------------------------------------------------ api */
+async function api(path, opts = {}) {
+  const headers = { ...(opts.headers || {}) };
+  if (state.token) headers.Authorization = "Bearer " + state.token;
+  let body = opts.body;
+  if (body && typeof body !== "string") {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(body);
+  }
+  const r = await fetch(path, { ...opts, headers, body });
+  let data;
+  try { data = await r.json(); } catch { data = { error: r.statusText || ("HTTP " + r.status) }; }
+  if (!r.ok) {
+    const err = new Error(data.error || ("HTTP " + r.status));
+    err.status = r.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
+
+/* ------------------------------------------------------------------ views */
+document.querySelectorAll(".nav button").forEach(b => b.onclick = () => {
+  state.view = b.dataset.view;
+  document.querySelectorAll(".nav button").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "view-" + state.view));
+  if (state.view === "sources" && !state.sourcesLoaded) loadSources();
+  if (state.view === "social") { loadSocialCatalog(); loadCases(); }
+  if (state.view === "imagerev") { loadImgrevCatalog(); loadCases(); }
+  if (state.view === "country") { loadCountries(); loadCases(); }
+  if (state.view === "intense") loadCases();
+  if (state.view === "trackpin") { loadCases(); loadTrackpin(); }
+  if (state.view === "pattern") loadCases();
+});
+
+const placeholders = {
+  auto: "e.g. Jane Doe / jane_doe / jane@example.com / example.com / +1 202-555-0143 / Acme Ltd",
+  username: "handle — e.g. jane_doe",
+  email: "email — e.g. jane@example.com",
+  phone: "phone — e.g. +1 202-555-0143",
+  domain: "domain — e.g. example.com",
+  ip: "IP — e.g. 8.8.8.8",
+  person: "full name or handle — e.g. Jane Doe / jane_doe",
+  social: "handle or full name — e.g. jane_doe / Jane Doe",
+  location: "phone / email / name / handle / domain — e.g. +1 415 555 2671",
+  profile: "public profile URL — e.g. https://www.instagram.com/jane_doe/",
+  company: "company name — e.g. Acme Ltd",
+  geo: "place — e.g. Berlin, Germany",
+};
+document.querySelectorAll("#modes .tab").forEach(b => b.onclick = () => {
+  state.mode = b.dataset.t;
+  document.querySelectorAll("#modes .tab").forEach(x => x.classList.toggle("on", x === b));
+  $("q").placeholder = placeholders[state.mode] || placeholders.auto;
+});
+
+/* ------------------------------------------------------------------ auth */
+function updateAuthUI() {
+  $("authState").textContent = state.user ? (state.user.username + " · " + state.user.role) : "guest";
+  $("authState").className = "badge " + (state.user ? "ok" : "");
+  $("loginToggle").classList.toggle("hidden", !!state.user);
+  $("logoutBtn").classList.toggle("hidden", !state.user);
+  $("countryAuthHint").classList.toggle("hidden", !!state.user);
+  $("socialAuthHint").classList.toggle("hidden", !!state.user);
+  $("imgrevAuthHint").classList.toggle("hidden", !!state.user);
+  $("intenseAuthHint").classList.toggle("hidden", !!state.user);
+  $("tpAuthHint").classList.toggle("hidden", !!state.user);
+  $("patternAuthHint").classList.toggle("hidden", !!state.user);
+  $("brokerAuthHint").classList.toggle("hidden", !!state.user);
+  $("recordsAuthHint").classList.toggle("hidden", !!state.user);
+}
+$("loginToggle").onclick = () => $("loginPanel").classList.toggle("hidden");
+async function doLogin() {
+  const username = $("username").value.trim();
+  const password = $("password").value;
+  if (!username || !password) { $("loginStatus").textContent = "username + password required"; return; }
+  $("loginStatus").innerHTML = '<span class="spinner"></span>signing in…';
+  try {
+    const j = await api("/api/auth/login", { method: "POST", body: { username, password } });
+    state.token = j.token || "";
+    state.user = j.user || { username, role: "analyst" };
+    localStorage.setItem("xaxglog_token", state.token);
+    localStorage.setItem("xaxglog_user", JSON.stringify(state.user));
+    $("loginPanel").classList.add("hidden");
+    $("password").value = "";
+    $("loginStatus").textContent = "";
+    updateAuthUI();
+    loadCases();
+    loadCountries();
+    loadTrackpin();
+  } catch (e) {
+    $("loginStatus").textContent = e.message;
+  }
+}
+$("loginBtn").onclick = doLogin;
+$("password").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+$("logoutBtn").onclick = () => {
+  state.token = ""; state.user = null;
+  localStorage.removeItem("xaxglog_token"); localStorage.removeItem("xaxglog_user");
+  updateAuthUI(); $("caseSelect").innerHTML = '<option value="">no case</option>';
+  $("tpCase").innerHTML = '<option value="">no case</option>';
+  $("countryCase").innerHTML = '<option value="">no case</option>';
+  $("socialCase").innerHTML = '<option value="">no case</option>';
+  $("imgrevCase").innerHTML = '<option value="">no case</option>';
+  $("tpOperations").querySelector("tbody").innerHTML = '<tr><td colspan="8" class="empty">Login and create an operation.</td></tr>';
+  $("tpDetail").classList.add("hidden");
+};
+
+try { state.user = JSON.parse(localStorage.getItem("xaxglog_user") || "null"); } catch {}
+updateAuthUI();
+if (state.token) {
+  api("/api/auth/me").then(u => { state.user = u; updateAuthUI(); loadCases(); loadCountries(); loadTrackpin(); })
+    .catch(() => { state.token = ""; state.user = null; localStorage.removeItem("xaxglog_token"); localStorage.removeItem("xaxglog_user"); updateAuthUI(); });
+}
+
+/* ------------------------------------------------------------------ search */
+$("go").onclick = runSearch;
+$("q").addEventListener("keydown", e => { if (e.key === "Enter") runSearch(); });
+$("copySearch").onclick = () => copyJSON(state.lastSearch, "searchCopyStatus");
+$("downloadSearch").onclick = () => downloadJSON(state.lastSearch, "xaxglog-search");
+
+async function runSearch() {
+  const q = $("q").value.trim();
+  if (!q) return;
+  const btn = $("go");
+  btn.disabled = true; btn.textContent = "Searching…";
+  $("searchStatus").innerHTML = '<span class="spinner"></span>querying public sources…';
+  $("out").textContent = "Querying international sources for: " + q + " …";
+  const t0 = performance.now();
+  try {
+    let j;
+    if (state.mode === "auto") {
+      j = await api("/api/deep/search", { method: "POST", body: { query: q } });
+    } else if (state.mode === "geo") {
+      j = await api("/api/deep/geo?place=" + encodeURIComponent(q));
+    } else if (state.mode === "company") {
+      j = await api("/api/deep/company?q=" + encodeURIComponent(q));
+    } else if (state.mode === "profile") {
+      j = await api("/api/deep/profile", { method: "POST", body: { url: q } });
+    } else if (state.mode === "social") {
+      j = await api("/api/deep/social", { method: "POST", body: { query: q, include_web: $("includeSocial").checked } });
+    } else if (state.mode === "person") {
+      j = await api("/api/deep/person", { method: "POST", body: {
+        query: q,
+        include_social: $("includeSocial").checked,
+        include_records: $("includeRecords")?.checked ?? true,
+        include_code: $("includeCode")?.checked ?? false,
+        depth: $("searchDepth")?.value || "standard",
+      } });
+    } else if (state.mode === "location") {
+      j = await api("/api/deep/location", { method: "POST", body: { query: q, include_profiles: $("includeSocial").checked } });
+    } else {
+      j = await api("/api/deep/" + state.mode, { method: "POST", body: { query: q } });
+    }
+    state.lastSearch = j;
+    $("out").textContent = JSON.stringify(j, null, 2);
+    renderSearch(j, Math.round(performance.now() - t0));
+    $("searchStatus").textContent = "completed in " + Math.round(performance.now() - t0) + " ms";
+  } catch (e) {
+    $("out").textContent = JSON.stringify(e.data || { error: e.message }, null, 2);
+    $("searchStatus").textContent = "error: " + e.message;
+    $("searchSummary").innerHTML = "";
+    $("profiles").innerHTML = '<div class="empty red">' + esc(e.message) + "</div>";
+    $("leads").innerHTML = '<div class="empty">No leads.</div>';
+  }
+  btn.disabled = false; btn.textContent = "Search";
+}
+
+function collectSearch(j) {
+  const profiles = [], leads = [];
+  const seenP = new Set(), seenL = new Set();
+  const addP = (h, src, fallback) => {
+    if (!h || h.exists === false) return;
+    const url = h.url || h.html_url || h.final_url || "";
+    const platform = h.platform || src || fallback || "profile";
+    const who = h.name || h.handle || h.username || h.login || h.acct || h.text || h.title || "";
+    const key = (platform + "|" + (url || who)).toLowerCase();
+    if (seenP.has(key) || (!url && !who)) return;
+    seenP.add(key);
+    profiles.push({ platform, who, url, category: h.category || src || "other", confidence: h.confidence || "", note: h.region || "" });
+  };
+  const addL = (name, url, src, detail) => {
+    const key = String(url || name || "").toLowerCase();
+    if (!key || seenL.has(key)) return;
+    seenL.add(key);
+    leads.push({ name: String(name || url || "lead"), url: url || "", source: src || "lead", detail: detail || "" });
+  };
+  const sourceRows = (sources, srcLabel) => {
+    Object.entries(sources || {}).forEach(([src, rows]) => {
+      (rows || []).slice(0, 6).forEach(x => addL(x.name || x.title || x.login || x.handle || x.acct || x.key || src, x.url || x.html_url, srcLabel || src, x.match ? "match " + x.match : ""));
+    });
+  };
+
+  const R = j.results || j;
+  if (R.username?.hits) R.username.hits.forEach(h => addP(h, "profile matrix"));
+  if (R.person?.profiles?.hits) R.person.profiles.hits.forEach(h => addP(h, "profile matrix"));
+  if (R.person?.name_platforms?.hits) R.person.name_platforms.hits.forEach(h => addP(h, "display-name search"));
+  if (R.name_platforms?.hits) R.name_platforms.hits.forEach(h => addP(h, "display-name search"));
+  if (j.name_platforms?.hits) j.name_platforms.hits.forEach(h => addP(h, "display-name search"));
+  if (R.person?.github?.html_url) addP({ ...R.person.github, platform: "GitHub" }, "github");
+  if (R.person?.verified?.verified) R.person.verified.verified.forEach(h => addP(h, "api verified"));
+  if (R.profiles?.hits) R.profiles.hits.forEach(h => addP(h, "profile matrix"));
+  if (R.verified?.verified) R.verified.verified.forEach(h => addP(h, "api verified"));
+  if (R.github?.html_url) addP({ ...R.github, platform: "GitHub" }, "github");
+  if (j.github?.html_url) addP({ ...j.github, platform: "GitHub" }, "github");
+  if (j.social_links) j.social_links.forEach(h => addP({ platform: h.platform, text: h.text, url: h.url }, "profile links"));
+  if (j.status === "ok" && j.final_url) addP({ platform: j.platform || "profile page", name: j.name || j.title, url: j.final_url }, "profile scraper");
+
+  sourceRows(R.person?.people?.sources, "people index");
+  sourceRows(R.people?.sources, "people index");
+  (j.identity?.results || R.identity?.results || []).forEach(x =>
+    addL(x.name || x.url, x.url, "identity · " + (x.source || "source"),
+         [x.detail, x.matched_variant ? "variant: " + x.matched_variant : "", x.confidence ? "confidence: " + x.confidence : ""].filter(Boolean).join(" · ")));
+  (j.identity?.link_out || []).slice(0, 40).forEach(x =>
+    addL(x.label || x.url, x.url, "identity link-out", x.category || ""));
+  (R.person?.social?.results || []).forEach(x => addL(x.title || x.url, x.url, "social web · " + (x.platform || "web"), (x.engines || []).join("+")));
+  (R.web?.results || []).forEach(x => addL(x.title || x.url, x.url, "social web · " + (x.platform || "web"), (x.engines || []).join("+")));
+  (R.domain?.subdomains?.sample || []).slice(0, 30).forEach(s => addL(s, "http://" + s, "subdomain"));
+  (R.urlscan?.sample || []).forEach(u => addL(u, u, "urlscan"));
+  (j.social_links || []).forEach(x => addL(x.text || x.url, x.url, "profile link · " + (x.platform || "")));
+  return { profiles, leads };
+}
+
+function renderSearch(j, ms) {
+  const { profiles, leads } = collectSearch(j);
+  state.lastProfiles = profiles;
+  state.profileFilter = "all";
+  const R = j.results || j;
+  const type = j.detected_type || j.query_type || (j.platform ? "profile" : state.mode);
+  const checked = R.username?.checked || R.profiles?.checked || R.person?.profiles?.checked || 0;
+  const peopleTotal = R.person?.people?.total ?? R.people?.total ?? 0;
+  const socialTotal = R.person?.social?.total ?? R.web?.total ?? 0;
+  const blocked = R.person?.social?.status === "blocked" || R.web?.status === "blocked";
+  const stats = [
+    ["type", type],
+    ["profiles", profiles.length],
+    ["leads", leads.length],
+    ["people", peopleTotal],
+    ["social", socialTotal],
+    ["time", ms + " ms"],
+  ];
+  if (checked) stats.splice(2, 0, ["checked", checked]);
+  $("searchSummary").innerHTML = stats.map(([l, v]) => '<div class="stat"><div class="v">' + esc(v) + '</div><div class="l">' + esc(l) + '</div></div>').join("")
+    + (blocked ? '<div class="stat"><div class="v orange">blocked</div><div class="l">social engines</div></div>' : "");
+
+  const cats = [...new Set(profiles.map(p => p.category || "other"))].sort();
+  $("profileFilters").innerHTML = ['all', ...cats].map(c =>
+    '<button class="tab ' + (c === state.profileFilter ? "on" : "") + '" data-cat="' + esc(c) + '">' + esc(c) + (c === "all" ? " · " + profiles.length : " · " + profiles.filter(p => (p.category || "other") === c).length) + "</button>"
+  ).join("");
+  document.querySelectorAll("#profileFilters .tab").forEach(b => b.onclick = () => {
+    state.profileFilter = b.dataset.cat; renderProfiles();
+    document.querySelectorAll("#profileFilters .tab").forEach(x => x.classList.toggle("on", x === b));
+  });
+  renderProfiles();
+  renderLeads(leads);
+  renderCoverage(j);
+  renderLocationSignals(j);
+}
+
+function renderProfiles() {
+  const list = state.lastProfiles.filter(p => state.profileFilter === "all" || (p.category || "other") === state.profileFilter);
+  if (!list.length) { $("profiles").innerHTML = '<div class="empty">No confirmed public profile hits.</div>'; return; }
+  $("profiles").innerHTML = list.slice(0, 120).map(p => {
+    const inner = '<div class="top"><span class="plat">' + esc(p.platform) + '</span><span class="tag">' + esc(p.category) + "</span></div>"
+      + (p.who ? '<div class="who">' + esc(p.who) + "</div>" : "")
+      + (p.url ? '<div class="url mono">' + esc(p.url) + "</div>" : "");
+    return p.url
+      ? '<a class="hit" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + inner + "</a>"
+      : '<div class="hit">' + inner + "</div>";
+  }).join("");
+}
+
+function renderLeads(leads) {
+  if (!leads.length) { $("leads").innerHTML = '<div class="empty">No people-index or social-web leads.</div>'; return; }
+  $("leads").innerHTML = leads.slice(0, 120).map(l => {
+    const inner = '<div class="top"><span class="plat">' + esc(l.source) + '</span></div>'
+      + '<div class="who">' + esc(l.name) + "</div>"
+      + (l.detail ? '<div class="url">' + esc(l.detail) + "</div>" : "")
+      + (l.url ? '<div class="url mono">' + esc(l.url) + "</div>" : "");
+    return l.url
+      ? '<a class="hit" href="' + esc(l.url) + '" target="_blank" rel="noopener">' + inner + "</a>"
+      : '<div class="hit">' + inner + "</div>";
+  }).join("");
+}
+
+function extractLocationSignals(j) {
+  const groups = [];
+  const add = g => { if (Array.isArray(g)) groups.push(...g); };
+  add(j?.signals);
+  add(j?.location?.signals);
+  add(j?.results?.phone?.location?.signals);
+  add(j?.results?.email?.location?.signals);
+  add(j?.results?.phone?.signals);
+  add(j?.results?.email?.signals);
+  add(j?.location_signals);
+  add(j?.person?.location_signals);
+  add(j?.results?.person?.location_signals);
+  add(j?.results?.social?.location_signals);
+  const out = [], seen = new Set();
+  for (const s of groups) {
+    if (!s || typeof s !== "object") continue;
+    const key = [s.type, s.value, s.source].join("|").toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
+}
+
+function renderCoverage(j) {
+  const R = j.results || j;
+  const cov = j.coverage || R.person?.coverage || R.username?.coverage ||
+              R.profiles?.coverage || j.profiles?.coverage;
+  const card = $("coverageCard");
+  if (!cov) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+  const chips = arr => (arr || []).map(x => '<span class="tag">' + esc(x) + "</span>").join("");
+  let html = "";
+  if (cov.by_source && cov.planned != null) {
+    const bs = cov.by_source || {};
+    const status = {};
+    Object.values(bs).forEach(x => { status[x.status] = (status[x.status] || 0) + 1; });
+    html += `<p class="desc">Identity plan: <strong>${esc(cov.planned)}</strong> sources, <strong>${esc(cov.executed)}</strong> executed (${esc(cov.coverage_pct)}% execution coverage). <strong>${esc(cov.ok || 0)}</strong> returned leads, <strong>${esc(cov.empty || 0)}</strong> were empty, <strong>${esc(cov.blocked || 0)}</strong> blocked, <strong>${esc(cov.link_out || 0)}</strong> link-out, <strong>${esc(cov.skipped_key || 0)}</strong> optional-key and <strong>${esc(cov.not_checked || 0)}</strong> not checked.</p>`;
+    html += '<div class="row">' + Object.entries(status).sort().map(([k, v]) => '<span class="tag">' + esc(k) + " · " + esc(v) + "</span>").join("") + "</div>";
+    const problems = Object.values(bs).filter(x => ["blocked", "error", "not_checked"].includes(x.status)).slice(0, 60);
+    if (problems.length) {
+      html += '<details style="margin-top:12px"><summary class="muted">blocked / error / not-checked sources</summary><div class="row" style="margin-top:8px">' +
+        problems.map(x => '<span class="tag" title="' + esc(x.detail || x.status) + '">' + esc(x.label) + " · " + esc(x.status) + "</span>").join("") + "</div></details>";
+    }
+    if (cov.note) html += '<p class="desc" style="margin-top:10px">' + esc(cov.note) + "</p>";
+  } else if (cov.mode === "name") {
+    html += `<p class="desc">Handle matrix: <strong>${esc(cov.total_platforms || 0)}</strong> platforms. Display-name APIs cover <strong>${esc(cov.name_searchable || 0)}</strong> of them directly, plus <strong>${esc((cov.additional_name_indexes || []).length)}</strong> additional academic/profile indexes and <strong>${esc(cov.people_index_sources || 0)}</strong> people-index sources. The other <strong>${esc((cov.not_name_searchable || []).length)}</strong> need a known handle/profile URL — Xaxglog does not bypass login walls.</p>`;
+    html += '<div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin:10px 0 6px">name-searchable sources</div><div class="row">' + chips(cov.checked_platforms) + "</div>";
+    if ((cov.not_name_searchable || []).length) {
+      html += `<details style="margin-top:12px"><summary class="muted">${esc((cov.not_name_searchable || []).length)} platforms need a handle/profile URL</summary><div class="row" style="margin-top:8px">${chips(cov.not_name_searchable)}</div></details>`;
+    }
+  } else {
+    const bs = cov.by_status || {};
+    html += `<p class="desc">Exact-handle probe: <strong>${esc(cov.checked || 0)}</strong> checked, <strong>${esc(cov.found || 0)}</strong> found, ${esc(cov.not_checked || 0)} not checked of ${esc(cov.total_platforms || 0)} configured platforms.</p>`;
+    html += '<div class="row">' + Object.entries(bs).map(([k, v]) => '<span class="tag">' + esc(k) + " · " + esc(v) + "</span>").join("") + "</div>";
+    if (cov.note) html += '<p class="desc" style="margin-top:10px">' + esc(cov.note) + "</p>";
+  }
+  const handles = j.handle_candidates || R.person?.handle_candidates ||
+                  R.handle_candidates || [];
+  if (handles.length) {
+    html += '<div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin:12px 0 6px">suggested handle spellings</div><div class="row">' +
+      chips(handles) + '</div><p class="desc" style="margin-top:6px">Suggestions only — submit one as a handle query to probe the 93-platform matrix.</p>';
+  }
+  const variants = j.people?.variants_tried || R.person?.people?.variants_tried ||
+                   R.people?.variants_tried || [];
+  if (variants.length) {
+    html += '<div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin:12px 0 6px">name variants tried</div><div class="row">' +
+      chips(variants) + "</div>";
+  }
+  $("coverageBody").innerHTML = html;
+}
+
+function renderLocationSignals(j) {
+  const signals = extractLocationSignals(j);
+  const card = $("locationCard");
+  if (!signals.length) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+  $("locationSignals").innerHTML = signals.map(s => {
+    let lat = s.lat, lon = s.lon;
+    if ((lat == null || lon == null) && typeof s.value === "string") {
+      const m = s.value.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+      if (m) { lat = m[1]; lon = m[2]; }
+    }
+    const osm = (lat != null && lon != null)
+      ? '<div class="url"><a href="https://www.openstreetmap.org/?mlat=' + encodeURIComponent(lat) + '&mlon=' + encodeURIComponent(lon) + '#map=14/' + encodeURIComponent(lat) + '/' + encodeURIComponent(lon) + '" target="_blank" rel="noopener">open map</a></div>'
+      : "";
+    return '<div class="hit">'
+      + '<div class="top"><span class="plat">' + esc(s.type || "signal") + '</span><span class="tag">' + esc(s.precision || "unknown") + "</span></div>"
+      + '<div class="who">' + esc(s.value || "") + "</div>"
+      + '<div class="url">' + esc(s.source || "") + (s.confidence ? " · " + esc(s.confidence) : "") + (s.note ? " · " + esc(s.note) : "") + "</div>"
+      + (s.url ? '<div class="url mono">' + esc(s.url) + "</div>" : "")
+      + osm
+      + "</div>";
+  }).join("");
+}
+
+/* ------------------------------------------------------------------ intense */
+$("intenseGo").onclick = runIntense;
+$("intenseTarget").addEventListener("keydown", e => { if (e.key === "Enter") runIntense(); });
+
+async function loadCountries() {
+  if (!state.token || state.countriesLoaded) return;
+  try {
+    const j = await api("/api/countryscope/countries");
+    const sel = $("countrySelect");
+    const current = sel.value;
+    sel.innerHTML = '<option value="auto">Auto-detect / choose country</option>' +
+      (j.countries || []).map(c => '<option value="' + esc(c.iso2) + '">' +
+        esc(c.name) + ' (' + esc(c.iso2) + ')</option>').join("");
+    sel.value = current || "auto";
+    state.countriesLoaded = true;
+  } catch (e) {
+    $("countryStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  }
+}
+
+async function loadCases() {
+  if (!state.token) return;
+  try {
+    const cases = await api("/api/cases");
+    const opts = '<option value="">no case</option>' + (cases || []).map(c =>
+      '<option value="' + esc(c.id) + '">' + esc(c.case_number || ("#" + c.id)) + " — " + esc(c.name) + "</option>"
+    ).join("");
+    $("caseSelect").innerHTML = opts;
+    $("tpCase").innerHTML = opts;
+    $("patternCase").innerHTML = opts;
+    $("recordsCase").innerHTML = opts;
+    $("countryCase").innerHTML = opts;
+    $("socialCase").innerHTML = opts;
+    $("imgrevCase").innerHTML = opts;
+  } catch {}
+}
+
+function intenseSpin(on) {
+  if (state.intenseTimer) { clearInterval(state.intenseTimer); state.intenseTimer = null; }
+  if (!on) { $("intenseBar").style.width = "100%"; return; }
+  state.intenseStart = Date.now();
+  const stages = [
+    "Profile matrix + people indexes…",
+    "Social footprint + email pivots…",
+    "Name variants + sanctions/courts…",
+    "Crawl, Wayback, leaks, netblock, ports…",
+    "Correlating entities and confidence…",
+  ];
+  let i = 0;
+  $("intenseBar").style.width = "8%";
+  $("intenseStatus").innerHTML = '<span class="spinner"></span>' + stages[0];
+  state.intenseTimer = setInterval(() => {
+    const elapsed = ((Date.now() - state.intenseStart) / 1000).toFixed(0);
+    i = (i + 1) % stages.length;
+    $("intenseStatus").innerHTML = '<span class="spinner"></span>' + esc(stages[i]) + ' <span class="muted">· ' + elapsed + "s</span>";
+    $("intenseBar").style.width = Math.min(92, 8 + (Date.now() - state.intenseStart) / 900) + "%";
+  }, 2400);
+}
+
+async function runIntense() {
+  const target = $("intenseTarget").value.trim();
+  if (!target) return;
+  if (!state.token) {
+    $("loginPanel").classList.remove("hidden");
+    $("loginStatus").textContent = "login required for intense recon";
+    return;
+  }
+  const btn = $("intenseGo");
+  btn.disabled = true; btn.textContent = "Running…";
+  $("intenseResult").innerHTML = "";
+  intenseSpin(true);
+  const caseId = $("caseSelect").value ? Number($("caseSelect").value) : null;
+  try {
+    const j = await api("/api/recon/deep", { method: "POST", body: { target, case_id: caseId } });
+    intenseSpin(false);
+    $("intenseStatus").textContent = "completed in " + j.elapsed + "s · axis status: "
+      + Object.entries(j.axis_status || {}).map(([k, v]) => k + "=" + v).join(", ");
+    renderIntense(j);
+  } catch (e) {
+    intenseSpin(false);
+    if (e.status === 401) {
+      state.token = ""; state.user = null;
+      localStorage.removeItem("xaxglog_token"); localStorage.removeItem("xaxglog_user");
+      updateAuthUI();
+    }
+    $("intenseStatus").innerHTML = '<span class="red">error: ' + esc(e.message) + "</span>";
+    $("intenseResult").innerHTML = '<div class="card"><pre>' + esc(JSON.stringify(e.data || { error: e.message }, null, 2)) + "</pre></div>";
+  }
+  btn.disabled = false; btn.textContent = "Run intense recon";
+}
+
+function renderIntense(j) {
+  if (!j || j.error) {
+    $("intenseResult").innerHTML = '<div class="card"><div class="empty red">' + esc(j?.error || "no result") + "</div></div>";
+    return;
+  }
+  const d = j.dossier || {};
+  const c = d.confidence || {};
+  const counts = d.counts || {};
+  const entities = d.entities || [];
+  const axes = j.axes || {};
+  const status = j.axis_status || {};
+  const okAxes = Object.values(status).filter(v => v === "ok" || v === "partial").length;
+  const confidence = pct(c.score);
+  const bandClass = c.band === "high" ? "ok" : (c.band === "medium" ? "warn" : "");
+  const countCards = [
+    ["profiles", counts.profile || 0], ["people", counts.person || 0], ["social", counts.social || 0],
+    ["emails", counts.email || 0], ["domains", counts.domain || 0], ["phones", counts.phone || 0],
+    ["ports", counts.port || 0], ["companies", counts.company || 0], ["officers", counts.officer || 0],
+  ];
+  const axisCards = Object.entries(status).map(([k, v]) => {
+    const cls = (v === "ok" || v === "partial") ? "ok" : (v === "error" ? "err" : "warn");
+    return '<div class="pill ' + cls + '">' + esc(k) + ": " + esc(v) + "</div>";
+  }).join("");
+
+  $("intenseResult").innerHTML = `
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <h3 style="margin:0">${esc(j.target || "")}</h3>
+          <p class="desc" style="margin:4px 0 0">detected type <span class="pill info">${esc(j.detected_type || "?")}</span>
+            · ${esc(j.elapsed)}s · ${okAxes}/${Object.keys(status).length} axes healthy</p>
+        </div>
+        <div class="row">
+          <button class="ghost small" id="copyIntense">Copy JSON</button>
+          <button class="ghost small" id="downloadIntense">Download JSON</button>
+          <span class="statusline" id="intenseCopyStatus"></span>
+        </div>
+      </div>
+      <div class="stats" style="margin-top:14px">
+        <div class="stat"><div class="v"><span class="pill ${bandClass}" style="font-size:15px">${esc((c.band || "low").toUpperCase())}</span></div><div class="l">confidence</div></div>
+        <div class="stat"><div class="v">${confidence}</div><div class="l">score / 100</div></div>
+        <div class="stat"><div class="v">${entities.length}</div><div class="l">entities</div></div>
+        <div class="stat"><div class="v">${okAxes}</div><div class="l">axes healthy</div></div>
+      </div>
+      <div class="progress"><div class="bar" style="width:${confidence}%"></div></div>
+      <div class="row">${(c.reasons || []).map(r => '<span class="badge">' + esc(r) + "</span>").join("")}</div>
+      <div style="margin-top:10px">${axisCards}</div>
+    </div>
+
+    <div class="card">
+      <h3>Dossier counts</h3>
+      <div class="stats">${countCards.map(([l, v]) => '<div class="stat"><div class="v">' + esc(v) + '</div><div class="l">' + esc(l) + "</div></div>").join("")}</div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:10px">
+        <h3 style="margin:0">Entities</h3>
+        <select id="entityFilter"><option value="all">all types</option>${[...new Set(entities.map(e => e.type))].sort().map(t => '<option value="' + esc(t) + '">' + esc(t) + "</option>").join("")}</select>
+      </div>
+      <div class="tablewrap"><table id="entityTable"><thead><tr><th>Type</th><th>Value</th><th>Source</th><th>Confidence</th></tr></thead><tbody>
+        ${entities.length ? entities.map(e => `<tr data-type="${esc(e.type)}"><td><span class="pill">${esc(e.type)}</span></td>
+          <td>${e.url ? '<a href="' + esc(e.url) + '" target="_blank" rel="noopener">' + esc(e.value) + "</a>" : esc(e.value)}</td>
+          <td class="muted">${esc(e.source || "")}</td><td class="muted">${esc(e.confidence || "")}</td></tr>`).join("")
+          : '<tr><td colspan="4" class="empty">No entities emitted.</td></tr>'}
+      </tbody></table></div>
+    </div>
+
+    <div class="card">
+      <h3>Axis detail</h3>
+      ${Object.entries(axes).map(([k, v]) => {
+        const st = status[k] || "";
+        const cls = (st === "ok" || st === "partial") ? "ok" : (st === "error" ? "err" : "warn");
+        return `<details class="axis ${cls}"><summary>${esc(k)} <span class="muted">· ${esc(st)}</span></summary>
+          <pre>${esc(JSON.stringify(v, null, 2))}</pre></details>`;
+      }).join("")}
+    </div>
+
+    <details class="card"><summary>Raw intense-recon response</summary><pre>${esc(JSON.stringify(j, null, 2))}</pre></details>
+  `;
+  $("copyIntense").onclick = () => copyJSON(j, "intenseCopyStatus");
+  $("downloadIntense").onclick = () => downloadJSON(j, "xaxglog-intense-" + String(j.target || "target").replace(/[^a-z0-9._-]+/gi, "_"));
+  const filter = $("entityFilter");
+  if (filter) filter.onchange = () => {
+    const want = filter.value;
+    document.querySelectorAll("#entityTable tbody tr[data-type]").forEach(tr => {
+      tr.style.display = (want === "all" || tr.dataset.type === want) ? "" : "none";
+    });
+  };
+}
+
+/* ------------------------------------------------------------------ identity */
+function identityPayload() {
+  return {
+    query: $("identityQuery").value.trim(),
+    depth: $("identityDepth").value || "standard",
+    country: $("identityCountry").value.trim() || "",
+    include_social: $("identitySocial").checked,
+    include_web: $("identityWeb").checked,
+    include_records: $("identityRecords").checked,
+    include_code: $("identityCode").checked,
+    include_link_out: $("identityLinks").checked,
+  };
+}
+
+$("identityGo").onclick = runIdentity;
+$("identityPlanBtn").onclick = runIdentityPlan;
+$("identityVariantBtn").onclick = runIdentityVariants;
+$("identityQuery").addEventListener("keydown", e => { if (e.key === "Enter") runIdentity(); });
+$("copyIdentity").onclick = () => copyJSON(state.lastIdentity, "identityCopyStatus");
+$("downloadIdentity").onclick = () => downloadJSON(state.lastIdentity, "xaxglog-identity");
+
+async function runIdentity() {
+  const body = identityPayload();
+  if (!body.query) return;
+  const btn = $("identityGo");
+  btn.disabled = true; btn.textContent = "Searching…";
+  $("identityStatus").innerHTML = '<span class="spinner"></span>normalizing, generating variants and querying public sources…';
+  $("identityRaw").textContent = "Running identity search for: " + body.query + " …";
+  const t0 = performance.now();
+  try {
+    const j = await api("/api/identity/search", { method: "POST", body });
+    state.lastIdentity = j;
+    $("identityRaw").textContent = JSON.stringify(j, null, 2);
+    renderIdentity(j, Math.round(performance.now() - t0));
+    $("identityStatus").textContent = "completed in " + Math.round(performance.now() - t0) + " ms";
+  } catch (e) {
+    $("identityRaw").textContent = JSON.stringify(e.data || { error: e.message }, null, 2);
+    $("identityStatus").textContent = "error: " + e.message;
+    $("identityResults").querySelector("tbody").innerHTML = '<tr><td colspan="5" class="empty red">' + esc(e.message) + "</td></tr>";
+  }
+  btn.disabled = false; btn.textContent = "Run identity search";
+}
+
+async function runIdentityPlan() {
+  const p = identityPayload();
+  if (!p.query) return;
+  $("identityStatus").innerHTML = '<span class="spinner"></span>building source plan…';
+  try {
+    const j = await api("/api/identity/plan?" + new URLSearchParams(p).toString());
+    state.lastIdentityPlan = j;
+    renderIdentityNormalized(j.normalized, j.variants, j.handle_variants);
+    const groups = j.groups || {};
+    $("identitySummary").innerHTML = [
+      ["kind", j.kind],
+      ["depth", j.depth],
+      ["planned sources", j.source_plan?.count || 0],
+      ["variants", (j.variants || []).length],
+      ["categories", Object.keys(groups).length],
+    ].map(([l, v]) => '<div class="stat"><div class="v">' + esc(v) + '</div><div class="l">' + esc(l) + "</div></div>").join("");
+    $("identityCoverage").innerHTML = '<p class="desc">Planned source groups</p><div class="row">' +
+      Object.entries(groups).sort().map(([k, v]) => '<span class="tag">' + esc(k) + " · " + esc((v || []).length) + "</span>").join("") +
+      '</div><p class="desc" style="margin-top:10px">' + esc(j.note || "") + "</p>";
+    $("identityRaw").textContent = JSON.stringify(j, null, 2);
+    $("identityStatus").textContent = "plan ready";
+  } catch (e) {
+    $("identityStatus").textContent = "plan error: " + e.message;
+  }
+}
+
+async function runIdentityVariants() {
+  const q = $("identityQuery").value.trim();
+  if (!q) return;
+  $("identityStatus").innerHTML = '<span class="spinner"></span>generating variants…';
+  try {
+    const j = await api("/api/identity/variants?q=" + encodeURIComponent(q));
+    renderIdentityNormalized(j.normalized, j.variants, j.handle_variants);
+    $("identitySummary").innerHTML = [
+      ["variants", (j.variants || []).length],
+      ["handle spellings", (j.handle_variants || []).length],
+      ["script", j.normalized?.script || ""],
+    ].map(([l, v]) => '<div class="stat"><div class="v">' + esc(v) + '</div><div class="l">' + esc(l) + "</div></div>").join("");
+    $("identityRaw").textContent = JSON.stringify(j, null, 2);
+    $("identityStatus").textContent = "variants ready";
+  } catch (e) {
+    $("identityStatus").textContent = "variant error: " + e.message;
+  }
+}
+
+function renderIdentityNormalized(norm, variants, handles) {
+  norm = norm || {};
+  const chips = arr => (arr || []).map(x => '<span class="tag">' + esc(x) + "</span>").join("");
+  $("identityNormalized").innerHTML =
+    '<p class="desc"><strong>input</strong> ' + esc(norm.input || "") + '<br/><strong>normalized</strong> ' + esc(norm.normalized || norm.base || "") +
+    (norm.comma_form ? '<br/><strong>comma form</strong> ' + esc(norm.comma_form) : "") +
+    (norm.suffixes?.length ? '<br/><strong>suffixes</strong> ' + esc(norm.suffixes.join(", ")) : "") +
+    '<br/><strong>script</strong> ' + esc(norm.script || "") + "</p>" +
+    '<div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin:10px 0 6px">name variants</div><div class="row">' + chips(variants) + "</div>" +
+    '<div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin:12px 0 6px">handle spellings</div><div class="row">' + chips(handles) + "</div>";
+}
+
+function renderIdentity(j, ms) {
+  const cov = j.coverage || {};
+  const counts = j.by_confidence || {};
+  $("identitySummary").innerHTML = [
+    ["total leads", j.total || 0],
+    ["high", counts.high || 0],
+    ["medium", counts.medium || 0],
+    ["lead", counts.lead || 0],
+    ["sources planned", cov.planned || 0],
+    ["executed", cov.executed || 0],
+    ["blocked", cov.blocked || 0],
+    ["link-outs", (j.link_out || []).length],
+    ["time", ms + " ms"],
+  ].map(([l, v]) => '<div class="stat"><div class="v">' + esc(v) + '</div><div class="l">' + esc(l) + "</div></div>").join("");
+  renderIdentityNormalized(j.normalized, j.variants, j.handle_variants);
+  renderIdentityCoverage(cov);
+  renderIdentityResults(j.results || []);
+  renderIdentityLinks(j.link_out || []);
+}
+
+function renderIdentityCoverage(cov) {
+  cov = cov || {};
+  if (!cov.by_source) {
+    $("identityCoverage").innerHTML = '<div class="empty">No coverage data.</div>';
+    return;
+  }
+  const status = {};
+  Object.values(cov.by_source).forEach(x => { status[x.status] = (status[x.status] || 0) + 1; });
+  let html = `<p class="desc">Planned <strong>${esc(cov.planned)}</strong>, executed <strong>${esc(cov.executed)}</strong> (${esc(cov.coverage_pct)}%). ` +
+    `<strong>${esc(cov.ok)}</strong> returned leads, <strong>${esc(cov.empty)}</strong> empty, <strong>${esc(cov.blocked)}</strong> blocked, ` +
+    `<strong>${esc(cov.skipped_key)}</strong> optional-key, <strong>${esc(cov.link_out)}</strong> link-out, <strong>${esc(cov.not_checked)}</strong> not checked.</p>`;
+  html += '<div class="row">' + Object.entries(status).sort().map(([k, v]) => '<span class="tag">' + esc(k) + " · " + esc(v) + "</span>").join("") + "</div>";
+  const problems = Object.values(cov.by_source).filter(x => ["blocked", "error", "not_checked"].includes(x.status)).slice(0, 50);
+  if (problems.length) {
+    html += '<details style="margin-top:12px"><summary class="muted">problem / unexecuted sources</summary><div class="row" style="margin-top:8px">' +
+      problems.map(x => '<span class="tag" title="' + esc(x.detail || x.status) + '">' + esc(x.label) + " · " + esc(x.status) + "</span>").join("") + "</div></details>";
+  }
+  $("identityCoverage").innerHTML = html;
+}
+
+function renderIdentityResults(rows) {
+  $("identityResultCount").textContent = rows.length;
+  const tbody = $("identityResults").querySelector("tbody");
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">No automatic hit. Check coverage: blocked, link-out and optional-key sources were not counted.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.slice(0, 400).map(r => {
+    const conf = r.confidence || "lead";
+    const pill = conf === "high" ? "red" : conf === "medium" ? "orange" : "";
+    return '<tr><td><span class="pill ' + pill + '">' + esc(conf) + "</span></td>" +
+      "<td>" + esc(r.source || "") + "</td>" +
+      "<td><strong>" + esc(r.name || "") + "</strong></td>" +
+      "<td>" + esc(r.detail || "") + "</td>" +
+      "<td>" + (r.url ? '<a href="' + esc(r.url) + '" target="_blank" rel="noopener" class="mono">' + esc(r.url) + "</a>" : "") + "</td></tr>";
+  }).join("");
+}
+
+function renderIdentityLinks(links) {
+  $("identityLinkCount").textContent = links.length;
+  if (!links.length) {
+    $("identityLinks").innerHTML = '<div class="empty">No link-outs.</div>';
+    return;
+  }
+  $("identityLinks").innerHTML = '<div class="row">' + links.slice(0, 400).map(x =>
+    '<a class="tag" href="' + esc(x.url) + '" target="_blank" rel="noopener" title="' + esc(x.category + " · " + x.access + " · " + x.status) + '">' +
+    esc(x.label) + "</a>").join("") + "</div>";
+}
+
+/* ------------------------------------------------------------------ sources */
+async function loadSources() {
+  $("sourcesSummary").innerHTML = '<div class="stat"><div class="v"><span class="spinner"></span></div><div class="l">loading registry</div></div>';
+  try {
+    const s = await api("/api/sources/registry?include_sources=true&limit=1000");
+    state.sourcesLoaded = true;
+    state.sourceRegistry = s;
+    $("sourcesSummary").innerHTML = [
+      ["total sources", s.total || 0],
+      ["verified", s.verified || 0],
+      ["adapter ready", s.adapter || 0],
+      ["queryable", s.queryable || 0],
+      ["optional key", s.optional_key || 0],
+      ["link-out", s.link_out || 0],
+      ["blocked", s.blocked || 0],
+      ["error", s.error || 0],
+      ["cataloged", s.cataloged || 0],
+    ].map(([l, v]) => '<div class="stat"><div class="v">' + esc(v) + '</div><div class="l">' + esc(l) + "</div></div>").join("");
+    const cats = s.by_category || {};
+    const catSelect = $("sourceLinkCategory");
+    catSelect.innerHTML = '<option value="">all</option>' + Object.keys(cats).sort().map(c => '<option value="' + esc(c) + '">' + esc(c) + " · " + esc(cats[c]) + "</option>").join("");
+    $("sourcesCategories").innerHTML = Object.entries(cats).sort().map(([cat, n]) => {
+      const rows = (s.sources || []).filter(x => x.category === cat);
+      const status = {};
+      rows.forEach(x => { status[x.status] = (status[x.status] || 0) + 1; });
+      return `<div class="card"><h3>${esc(cat)} <span class="pill">${esc(n)}</span></h3>
+        <p class="desc">${Object.entries(status).sort().map(([k, v]) => esc(k) + " " + esc(v)).join(" · ")}</p>
+        <div class="row" style="margin-top:10px">${rows.slice(0, 40).map(x => '<span class="tag" title="' + esc(x.access + " · " + x.status + " · " + (x.adapter || "no adapter")) + '">' + esc(x.label) + "</span>").join("")}${rows.length > 40 ? '<span class="tag">+' + esc(rows.length - 40) + " more</span>" : ""}</div></div>`;
+    }).join("");
+    const tbody = document.querySelector("#platformTable tbody");
+    tbody.innerHTML = (s.sources || []).map(x =>
+      `<tr><td><strong>${esc(x.label)}</strong><div class="mono muted">${esc(x.id)}</div></td>
+       <td><span class="pill">${esc(x.category)}</span></td><td>${esc(x.access)}</td>
+       <td><span class="pill ${x.status === "blocked" ? "red" : x.status === "verified" ? "" : "orange"}">${esc(x.status)}</span></td>
+       <td class="mono">${esc(x.adapter || "")}</td><td>${esc(x.region)}</td>
+       <td>${x.requires_key ? esc(x.key_env || "required") : ""}</td>
+       <td class="mono muted">${esc(x.search || x.profile_url || x.homepage || "")}</td></tr>`).join("");
+  } catch (e) {
+    $("sourcesSummary").innerHTML = '<div class="empty red">' + esc(e.message) + "</div>";
+  }
+}
+
+$("sourceLinkGo").onclick = async () => {
+  const q = $("sourceLinkQuery").value.trim();
+  if (!q) return;
+  const cat = $("sourceLinkCategory").value;
+  $("sourceLinkStatus").innerHTML = '<span class="spinner"></span>building public links…';
+  try {
+    const j = await api("/api/sources/links?" + new URLSearchParams({ q, categories: cat, limit: 500 }).toString());
+    const links = j.links || [];
+    $("sourceLinkStatus").textContent = links.length + " public link-outs";
+    $("sourceLinks").innerHTML = '<div class="row">' + links.map(x =>
+      '<a class="tag" href="' + esc(x.url) + '" target="_blank" rel="noopener" title="' + esc(x.category + " · " + x.access + " · " + x.status) + '">' + esc(x.label) + "</a>").join("") + "</div>";
+  } catch (e) {
+    $("sourceLinkStatus").textContent = "error: " + e.message;
+  }
+};
+
+/* ------------------------------------------------------------------ trackpin */
+$("tpCreateBtn").onclick = createTrackpin;
+$("tpRefresh").onclick = loadTrackpin;
+$("tpCloseBtn").onclick = () => { $("tpDetail").classList.add("hidden"); state.trackpinCurrent = null; };
+$("tpAddPointBtn").onclick = addTrackpinPoint;
+$("tpConsentBtn").onclick = createTrackpinConsent;
+$("tpGeoBtn").onclick = downloadTrackpinGeojson;
+
+async function loadTrackpin() {
+  if (!state.token) return;
+  try {
+    const ops = await api("/api/trackpin/operations");
+    state.trackpinOps = ops || [];
+    renderTrackpinOps(state.trackpinOps);
+  } catch (e) {
+    $("tpOperations").querySelector("tbody").innerHTML =
+      '<tr><td colspan="8" class="empty red">' + esc(e.message) + "</td></tr>";
+  }
+}
+
+function renderTrackpinOps(ops) {
+  const tbody = $("tpOperations").querySelector("tbody");
+  if (!ops.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">No TrackPin operations yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = ops.map(o => `<tr>
+    <td>#${esc(o.id)}</td><td><strong>${esc(o.label)}</strong></td><td class="mono">${esc(o.target)}</td>
+    <td><span class="pill ${o.mode === "consent_checkin" ? "purple" : (o.mode === "authority_request" ? "warn" : "info")}">${esc(o.mode)}</span></td>
+    <td><span class="pill ${o.status === "consented" ? "ok" : (o.status === "requested" ? "warn" : "")}">${esc(o.status)}</span></td>
+    <td>${esc(o.point_count || 0)}</td><td class="muted">${esc(o.created_at || "")}</td>
+    <td><button class="ghost small" data-op="${esc(o.id)}">Open</button></td></tr>`).join("");
+  tbody.querySelectorAll("button[data-op]").forEach(b => b.onclick = () => openTrackpin(Number(b.dataset.op)));
+}
+
+async function createTrackpin() {
+  if (!state.token) {
+    $("tpCreateStatus").textContent = "login required";
+    $("loginPanel").classList.remove("hidden");
+    return;
+  }
+  const body = {
+    label: $("tpLabel").value.trim(),
+    target: $("tpTarget").value.trim(),
+    mode: $("tpMode").value,
+    case_id: $("tpCase").value ? Number($("tpCase").value) : null,
+    legal_basis: $("tpLegal").value.trim(),
+    ttl_hours: 24,
+  };
+  if (!body.label || !body.target) { $("tpCreateStatus").textContent = "label and target required"; return; }
+  if (body.mode === "authority_request" && !body.legal_basis) { $("tpCreateStatus").textContent = "legal basis required for authority mode"; return; }
+  $("tpCreateStatus").innerHTML = '<span class="spinner"></span>creating…';
+  try {
+    const j = await api("/api/trackpin/operations", { method: "POST", body });
+    $("tpCreateStatus").innerHTML = j.consent_url
+      ? 'created · consent link: <a href="' + esc(j.consent_url) + '" target="_blank" rel="noopener">open</a>'
+      : "created";
+    $("tpLabel").value = ""; $("tpTarget").value = ""; $("tpLegal").value = "";
+    await loadTrackpin();
+    if (j.operation?.id) await openTrackpin(j.operation.id);
+  } catch (e) {
+    $("tpCreateStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  }
+}
+
+async function openTrackpin(opId) {
+  try {
+    const j = await api("/api/trackpin/operations/" + opId);
+    state.trackpinCurrent = j.operation;
+    renderTrackpinDetail();
+  } catch (e) {
+    $("tpStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  }
+}
+
+function renderTrackpinDetail() {
+  const o = state.trackpinCurrent;
+  if (!o) return;
+  $("tpDetail").classList.remove("hidden");
+  $("tpTitle").textContent = "#" + o.id + " · " + o.label;
+  $("tpMeta").innerHTML = [
+    "target " + esc(o.target),
+    "mode " + esc(o.mode),
+    "status " + esc(o.status),
+    o.case_id ? "case #" + esc(o.case_id) : "no case",
+    "by " + esc(o.created_by),
+    o.consent_expires ? "consent expires " + esc(o.consent_expires) : "",
+    o.consent_used ? "consent link used" : "",
+  ].filter(Boolean).join(" · ");
+
+  const consentUrl = o.consent_token ? location.origin + "/trackpin/consent/" + o.consent_token : "";
+  $("tpConsentBox").innerHTML = consentUrl
+    ? `<div class="box" style="background:#0b1220;border:1px solid #223047;border-radius:10px;padding:12px;margin-top:10px">
+         <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">one-time consent link ${o.consent_used ? "(used)" : ""}</div>
+         <div class="mono" style="font-size:11.5px;word-break:break-all;margin-top:4px">${esc(consentUrl)}</div>
+         <div class="row" style="margin-top:8px"><button class="ghost small" id="tpCopyLink">Copy link</button>
+         <a class="badge" href="${esc(consentUrl)}" target="_blank" rel="noopener">Open consent page</a></div>
+       </div>`
+    : '<div class="muted" style="font-size:12px;margin-top:8px">No active consent link. Use “New consent link” to issue one.</div>';
+  const copyBtn = $("tpCopyLink");
+  if (copyBtn) copyBtn.onclick = () => copyText(consentUrl);
+
+  $("tpAuthorityBox").innerHTML = o.mode === "authority_request"
+    ? `<div class="box" style="background:#0b1220;border:1px solid #223047;border-radius:10px;padding:12px;margin-top:12px">
+         <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">authority request packet</div>
+         <div class="row" style="margin-top:8px;align-items:flex-end">
+           <div><label class="badge">agency</label><input id="tpAgency" placeholder="agency / carrier liaison"/></div>
+           <div><label class="badge">reference</label><input id="tpRef" placeholder="warrant / case ref"/></div>
+           <div style="flex:1;min-width:160px"><label class="badge">legal basis</label><input id="tpLegal2" value="${esc(o.legal_basis || "")}"/></div>
+           <button class="orange" id="tpAuthBtn">Generate packet</button>
+         </div>
+         <div id="tpPacket"></div>
+       </div>`
+    : "";
+  const authBtn = $("tpAuthBtn");
+  if (authBtn) authBtn.onclick = requestTrackpinAuthority;
+
+  const points = o.points || [];
+  $("tpPoints").querySelector("tbody").innerHTML = points.length ? points.map(p => {
+    const map = "https://www.openstreetmap.org/?mlat=" + encodeURIComponent(p.lat) + "&mlon=" + encodeURIComponent(p.lon) + "#map=15/" + encodeURIComponent(p.lat) + "/" + encodeURIComponent(p.lon);
+    return `<tr><td>${esc(p.id)}</td><td class="muted">${esc(p.captured_at)}</td>
+      <td class="mono">${esc(p.lat)}, ${esc(p.lon)}</td><td>${p.accuracy_m == null ? "—" : "±" + esc(Math.round(p.accuracy_m)) + " m"}</td>
+      <td><span class="pill">${esc(p.source)}</span></td><td>${p.consent ? '<span class="pill ok">explicit</span>' : '<span class="pill warn">operator</span>'}</td>
+      <td><a href="${esc(map)}" target="_blank" rel="noopener">map</a></td></tr>`;
+  }).join("") : '<tr><td colspan="7" class="empty">No points captured yet.</td></tr>';
+}
+
+async function addTrackpinPoint() {
+  const o = state.trackpinCurrent;
+  if (!o) return;
+  const body = {
+    lat: $("tpLat").value, lon: $("tpLon").value,
+    accuracy_m: $("tpAcc").value, source: $("tpSource").value,
+    note: $("tpNote").value, consent: false,
+  };
+  $("tpStatus").innerHTML = '<span class="spinner"></span>adding point…';
+  try {
+    await api("/api/trackpin/operations/" + o.id + "/points", { method: "POST", body });
+    $("tpStatus").textContent = "point added";
+    await openTrackpin(o.id);
+    await loadTrackpin();
+  } catch (e) {
+    $("tpStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  }
+}
+
+async function createTrackpinConsent() {
+  const o = state.trackpinCurrent;
+  if (!o) return;
+  try {
+    const j = await api("/api/trackpin/operations/" + o.id + "/consent-link", { method: "POST", body: { ttl_hours: 24 } });
+    $("tpStatus").innerHTML = 'new consent link: <a href="' + esc(j.consent_url) + '" target="_blank" rel="noopener">open</a>';
+    await openTrackpin(o.id);
+  } catch (e) {
+    $("tpStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  }
+}
+
+async function requestTrackpinAuthority() {
+  const o = state.trackpinCurrent;
+  if (!o) return;
+  try {
+    const j = await api("/api/trackpin/operations/" + o.id + "/authority", {
+      method: "POST",
+      body: {
+        agency: $("tpAgency").value.trim(),
+        reference: $("tpRef").value.trim(),
+        legal_basis: $("tpLegal2").value.trim(),
+      },
+    });
+    $("tpPacket").innerHTML = '<pre style="margin-top:10px">' + esc(j.packet) + "</pre>";
+    $("tpStatus").textContent = j.notice || "packet generated";
+    await loadTrackpin();
+  } catch (e) {
+    $("tpStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  }
+}
+
+async function downloadTrackpinGeojson() {
+  const o = state.trackpinCurrent;
+  if (!o) return;
+  try {
+    const j = await api("/api/trackpin/operations/" + o.id + "/geojson");
+    downloadJSON(j, "trackpin-" + o.id);
+  } catch (e) {
+    $("tpStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  }
+}
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); $("tpStatus").textContent = "copied"; }
+  catch { $("tpStatus").textContent = "clipboard unavailable"; }
+}
+
+/* ------------------------------------------------------------------ pattern */
+$("patternCollect").onclick = collectPattern;
+$("patternPnl").onclick = patternPnl;
+$("patternContacts").onclick = patternContacts;
+$("patternIps").onclick = patternLedgers;
+$("patternEmail").onclick = patternEmailGraph;
+
+function patternEntity() {
+  const entity = $("patternEntity").value.trim();
+  if (!entity) { $("patternStatus").textContent = "entity required"; return ""; }
+  return entity;
+}
+function patternCaseQuery() {
+  const cid = $("patternCase").value;
+  return cid ? "?case_id=" + encodeURIComponent(cid) : "";
+}
+function patternBusy(on, label) {
+  const btn = $("patternCollect");
+  btn.disabled = on;
+  btn.textContent = on ? (label || "Working…") : "Collect public interactions";
+  if (on) $("patternStatus").innerHTML = '<span class="spinner"></span>' + esc(label || "working…");
+}
+
+async function collectPattern() {
+  if (!state.token) { $("patternStatus").textContent = "login required"; return; }
+  const entity = patternEntity(); if (!entity) return;
+  const plats = $("patternPlatforms").value.split(",").map(x => x.trim()).filter(Boolean);
+  const body = { entity, case_id: $("patternCase").value ? Number($("patternCase").value) : undefined };
+  if (plats.length) body.platforms = plats;
+  patternBusy(true, "collecting public interactions…");
+  try {
+    const j = await api("/api/pattern/collect", { method: "POST", body });
+    $("patternOut").textContent = JSON.stringify(j, null, 2);
+    $("patternStatus").textContent = "collected · events " + (j.events?.inserted ?? 0) +
+      " · links " + (j.links_created ?? 0) + " · urls " + (j.urls_recorded ?? 0);
+  } catch (e) {
+    $("patternStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  } finally { patternBusy(false); }
+}
+
+async function patternPnl() {
+  if (!state.token) { $("patternStatus").textContent = "login required"; return; }
+  const entity = patternEntity(); if (!entity) return;
+  patternBusy(true, "building pattern of life…");
+  try {
+    const j = await api("/api/pattern/pnl/" + encodeURIComponent(entity) + patternCaseQuery());
+    $("patternOut").textContent = JSON.stringify(j, null, 2);
+    $("patternStatus").textContent = "pattern of life · " + (j.interactions ?? 0) + " interactions";
+  } catch (e) {
+    $("patternStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  } finally { patternBusy(false); }
+}
+
+async function patternContacts() {
+  if (!state.token) { $("patternStatus").textContent = "login required"; return; }
+  const entity = patternEntity(); if (!entity) return;
+  patternBusy(true, "ranking contacts…");
+  try {
+    const j = await api("/api/pattern/frequent_contacts/" + encodeURIComponent(entity) + patternCaseQuery());
+    $("patternSide").textContent = JSON.stringify(j, null, 2);
+    $("patternStatus").textContent = "frequent contacts · " + (j.count ?? 0);
+  } catch (e) {
+    $("patternStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  } finally { patternBusy(false); }
+}
+
+async function patternLedgers() {
+  if (!state.token) { $("patternStatus").textContent = "login required"; return; }
+  const entity = patternEntity(); if (!entity) return;
+  patternBusy(true, "reading URL + IP ledgers…");
+  try {
+    const [diet, ips] = await Promise.all([
+      api("/api/pattern/diet/" + encodeURIComponent(entity) + patternCaseQuery()),
+      api("/api/pattern/ips/" + encodeURIComponent(entity) + patternCaseQuery()),
+    ]);
+    $("patternSide").textContent = JSON.stringify({ url_diet: diet, ip_ledger: ips }, null, 2);
+    $("patternStatus").textContent = "URL domains " + (diet.total ?? 0) + " · IPs " + (ips.count ?? 0);
+  } catch (e) {
+    $("patternStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  } finally { patternBusy(false); }
+}
+
+async function patternEmailGraph() {
+  if (!state.token) { $("patternEmailStatus").textContent = "login required"; return; }
+  const headers = $("patternHeaders").value.trim();
+  if (!headers) { $("patternEmailStatus").textContent = "headers required"; return; }
+  const body = { headers, ingest: true,
+                 case_id: $("patternCase").value ? Number($("patternCase").value) : undefined };
+  $("patternEmailStatus").innerHTML = '<span class="spinner"></span>parsing headers…';
+  try {
+    const j = await api("/api/pattern/email_graph", { method: "POST", body });
+    $("patternEmailOut").textContent = JSON.stringify(j, null, 2);
+    $("patternEmailStatus").textContent = "threads " + (j.thread_count ?? 0) +
+      " · messages " + (j.messages ?? 0) + (j.ooo_signal ? " · auto-responder signal" : "");
+  } catch (e) {
+    $("patternEmailStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  }
+}
+
+/* ------------------------------------------------------------------ broker */
+$("brokerSweep").onclick = sweepBrokers;
+
+async function sweepBrokers() {
+  if (!state.token) { $("brokerStatus").textContent = "login required"; return; }
+  const mode = $("brokerMode").value;
+  const name = $("brokerName").value.trim();
+  const address = $("brokerAddress").value.trim();
+  if (!name && !address) { $("brokerStatus").textContent = "name or address required"; return; }
+  const btn = $("brokerSweep");
+  btn.disabled = true; btn.textContent = "Sweeping…";
+  $("brokerStatus").innerHTML = '<span class="spinner"></span>checking public broker pages (rate-limited)…';
+  try {
+    const j = await api("/api/broker/sweep", {
+      method: "POST", body: { name, address, mode, delay: 0.5 },
+    });
+    $("brokerOut").textContent = JSON.stringify(j, null, 2);
+    $("brokerSummary").innerHTML = [
+      ["hits", j.hits ?? 0], ["blocked", j.blocked ?? 0],
+      ["clean", j.clean ?? 0],
+      ["exposure", j.exposure_score == null ? "—" : j.exposure_score + "%"],
+    ].map(([l, v]) => '<div class="stat"><div class="v">' + esc(v) + '</div><div class="l">' + esc(l) + "</div></div>").join("");
+    const tbody = document.querySelector("#brokerTable tbody");
+    tbody.innerHTML = (j.results || []).map(r => {
+      const cls = r.status === "possible_hit" ? "warn" : (r.status === "no_signal" ? "ok" : "err");
+      return '<tr><td><strong>' + esc(r.label || r.id) + '</strong></td>' +
+        '<td><span class="pill ' + cls + '">' + esc(r.status) + '</span></td>' +
+        '<td>' + esc(r.evidence || "—") + '</td><td>' + esc(r.http ?? "—") + '</td>' +
+        '<td class="mono muted">' + esc(r.url || "") + '</td></tr>';
+    }).join("") || '<tr><td colspan="5" class="empty">No broker results.</td></tr>';
+    $("brokerStatus").textContent = "sweep complete · " + (j.brokers_checked ?? 0) +
+      " brokers checked";
+  } catch (e) {
+    $("brokerStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  } finally { btn.disabled = false; btn.textContent = "Sweep brokers"; }
+}
+
+/* ------------------------------------------------------------------ social */
+$("socialGo").onclick = runSocial;
+$("socialQuery").addEventListener("keydown", e => { if (e.key === "Enter") runSocial(); });
+
+async function loadSocialCatalog() {
+  if (state.socialCatalogLoaded) return;
+  try {
+    const c = await api("/api/socialscrape/catalog");
+    const rsel = $("socialRegion");
+    const curR = rsel.value;
+    rsel.innerHTML = '<option value="all">all regions</option>' +
+      (c.regions || []).map(r => '<option value="' + esc(r) + '">' + esc(r) + "</option>").join("");
+    rsel.value = curR || "all";
+    const csel = $("socialCategory");
+    const curC = csel.value;
+    csel.innerHTML = '<option value="all">all categories</option>' +
+      (c.categories || []).map(r => '<option value="' + esc(r) + '">' + esc(r) + "</option>").join("");
+    csel.value = curC || "all";
+    state.socialCatalogLoaded = true;
+    $("socialStatus").textContent = (c.platforms || 0) + " platforms · " +
+      (c.searchable_platforms || 0) + " with public search links";
+  } catch (e) {
+    $("socialStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  }
+}
+
+function socialResultCard(r) {
+  const url = r.url ? '<div class="url mono"><a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(r.url) + "</a></div>" : "";
+  const meta = [r.author, r.published].filter(Boolean).map(esc).join(" · ");
+  const imgs = (r.images || []).slice(0, 3).map(u =>
+    '<div class="url mono"><a href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(u) + "</a></div>").join("");
+  return '<div class="hit"><div class="top"><span class="plat">' + esc(r.platform || r.source || "result") +
+    '</span>' + (r.post_type ? '<span class="tag">' + esc(r.post_type) + "</span>" : "") +
+    (r.source ? '<span class="tag">' + esc(r.source) + "</span>" : "") + "</div>" +
+    '<div class="who">' + esc(r.title || r.url || "") + "</div>" +
+    (r.snippet ? '<div class="url">' + esc(r.snippet) + "</div>" : "") +
+    (meta ? '<div class="url">' + meta + "</div>" : "") + imgs + url + "</div>";
+}
+
+function renderSocial(j) {
+  const s = j.summary || {};
+  $("socialSummary").innerHTML = [
+    ["status", j.status || "unknown"], ["results", s.results ?? (j.results || []).length],
+    ["search links", s.search_links ?? (j.search_links || []).length],
+    ["platforms", j.platforms_selected ?? "—"],
+    ["profiles", s.profiles ?? (j.profiles || []).length],
+  ].map(([l, v]) => '<div class="stat"><div class="v">' + esc(v) + '</div><div class="l">' + esc(l) + "</div></div>").join("");
+  const cards = (j.results || []).map(socialResultCard);
+  (j.scraped_pages || []).forEach(p => {
+    if (p && p.status === "ok") {
+      cards.push(socialResultCard({
+        platform: p.platform, title: p.title || p.final_url, snippet: p.description,
+        author: p.author, published: p.published, url: p.final_url,
+        images: p.images, post_type: p.post_type, source: "scraped_page",
+      }));
+    }
+  });
+  $("socialResults").innerHTML = cards.join("") ||
+    '<div class="empty">' + esc(j.note || "No public results. Use the platform search links.") + "</div>";
+  $("socialLinks").innerHTML = (j.search_links || []).slice(0, 120).map(l =>
+    '<div class="hit"><div class="top"><span class="plat">' + esc(l.platform) +
+    '</span><span class="tag">' + esc(l.region || "") + "</span></div>" +
+    '<div class="url mono"><a href="' + esc(l.url) + '" target="_blank" rel="noopener">' +
+    esc(l.url) + "</a></div></div>").join("") ||
+    '<div class="empty">No platform search links.</div>';
+  $("socialOut").textContent = JSON.stringify(j, null, 2);
+}
+
+async function runSocial() {
+  if (!state.token) { $("socialStatus").textContent = "login required"; return; }
+  const query = $("socialQuery").value.trim();
+  if (!query) { $("socialStatus").textContent = "query required"; return; }
+  const btn = $("socialGo");
+  btn.disabled = true; btn.textContent = "Searching…";
+  $("socialStatus").innerHTML = '<span class="spinner"></span>querying public social sources…';
+  try {
+    const j = await api("/api/socialscrape/search", {
+      method: "POST", body: {
+        query,
+        region: $("socialRegion").value,
+        category: $("socialCategory").value,
+        platforms: $("socialPlatforms").value.trim() || undefined,
+        scrape: $("socialScrape").checked,
+        probe: $("socialProbe").checked,
+        case_id: $("socialCase").value ? Number($("socialCase").value) : undefined,
+        limit: 30,
+      },
+    });
+    renderSocial(j);
+    $("socialStatus").textContent = "completed · " + (j.status || "unknown") +
+      " · " + ((j.summary || {}).results ?? 0) + " results · " +
+      ((j.search_links || []).length) + " search links";
+  } catch (e) {
+    $("socialOut").textContent = JSON.stringify(e.data || { error: e.message }, null, 2);
+    $("socialResults").innerHTML = '<div class="empty red">' + esc(e.message) + "</div>";
+    $("socialStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  } finally { btn.disabled = false; btn.textContent = "Search social"; }
+}
+
+/* ------------------------------------------------------------------ image reverse */
+$("imgrevGo").onclick = runImgrev;
+$("imgrevUrl").addEventListener("keydown", e => { if (e.key === "Enter") runImgrev(); });
+
+async function loadImgrevCatalog() {
+  if (state.imgrevCatalogLoaded) return;
+  try {
+    const c = await api("/api/imgreverse/catalog");
+    const labels = {};
+    (c.engines_list || []).forEach(e => { labels[e.id] = e.label || e.id; });
+    state.imgrevLabels = labels;
+    state.imgrevCatalogLoaded = true;
+    $("imgrevStatus").textContent = (c.engines || 0) + " engines · " +
+      (c.link_engines || 0) + " link-out · " + (c.api_engines || 0) + " API";
+  } catch (e) {
+    $("imgrevStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  }
+}
+
+function imgrevLinkCard(id, url) {
+  const label = state.imgrevLabels[id] || id;
+  return '<div class="hit"><div class="top"><span class="plat">' + esc(label) +
+    '</span><span class="tag">link</span></div>' +
+    '<div class="url mono"><a href="' + esc(url) + '" target="_blank" rel="noopener">' +
+    esc(url) + "</a></div></div>";
+}
+
+function renderImgrev(j) {
+  const s = j.summary || {};
+  $("imgrevSummary").innerHTML = [
+    ["status", j.status || "unknown"], ["hits", s.total_hits ?? 0],
+    ["links", s.links ?? Object.keys(j.links || {}).length],
+    ["API engines", s.engines_checked ?? 0],
+  ].map(([l, v]) => '<div class="stat"><div class="v">' + esc(v) + '</div><div class="l">' + esc(l) + "</div></div>").join("");
+  $("imgrevLinks").innerHTML = Object.entries(j.links || {}).map(([id, url]) =>
+    imgrevLinkCard(id, url)).join("") || '<div class="empty">No links generated.</div>';
+  const hits = (j.hits || []).map(h => {
+    const url = h.url ? '<div class="url mono"><a href="' + esc(h.url) + '" target="_blank" rel="noopener">' + esc(h.url) + "</a></div>" : "";
+    const extra = [h.episode ? "ep " + h.episode : "", h.similarity != null ? "similarity " + h.similarity : ""].filter(Boolean).join(" · ");
+    return '<div class="hit"><div class="top"><span class="plat">' + esc(h.source || "hit") +
+      '</span>' + (extra ? '<span class="tag">' + esc(extra) + "</span>" : "") + "</div>" +
+      '<div class="who">' + esc(h.title || "match") + "</div>" + url + "</div>";
+  });
+  const statuses = Object.entries(j.engines || {}).map(([k, v]) =>
+    '<div class="hit"><div class="top"><span class="plat">' + esc(state.imgrevLabels[k] || k) +
+    '</span><span class="tag">' + esc(v.status || "unknown") + "</span></div>" +
+    (v.note || v.error ? '<div class="url">' + esc(v.note || v.error) + "</div>" : "") + "</div>");
+  $("imgrevHits").innerHTML = hits.concat(statuses).join("") ||
+    '<div class="empty">No API hits. Use the engine links.</div>';
+  $("imgrevOut").textContent = JSON.stringify(j, null, 2);
+}
+
+async function runImgrev() {
+  if (!state.token) { $("imgrevStatus").textContent = "login required"; return; }
+  const image_url = $("imgrevUrl").value.trim();
+  const image_path = $("imgrevPath").value.trim();
+  if (!image_url && !image_path) { $("imgrevStatus").textContent = "public image URL or local path required"; return; }
+  const btn = $("imgrevGo");
+  btn.disabled = true; btn.textContent = "Looking up…";
+  $("imgrevStatus").innerHTML = '<span class="spinner"></span>building links and querying APIs…';
+  try {
+    const j = await api("/api/imgreverse/search", {
+      method: "POST", body: {
+        image_url: image_url || undefined,
+        image_path: image_path || undefined,
+        include_api: $("imgrevApi").checked,
+        case_id: $("imgrevCase").value ? Number($("imgrevCase").value) : undefined,
+      },
+    });
+    renderImgrev(j);
+    $("imgrevStatus").textContent = "completed · " + (j.status || "unknown") +
+      " · " + ((j.summary || {}).total_hits ?? 0) + " hits · " +
+      Object.keys(j.links || {}).length + " links";
+  } catch (e) {
+    $("imgrevOut").textContent = JSON.stringify(e.data || { error: e.message }, null, 2);
+    $("imgrevHits").innerHTML = '<div class="empty red">' + esc(e.message) + "</div>";
+    $("imgrevStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  } finally { btn.disabled = false; btn.textContent = "Lookup image"; }
+}
+
+/* ------------------------------------------------------------------ country */
+$("countryGo").onclick = runCountryScope;
+$("countryQuery").addEventListener("keydown", e => { if (e.key === "Enter") runCountryScope(); });
+
+function countrySignalCard(s) {
+  const url = s.url ? '<div class="url mono"><a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.url) + "</a></div>" : "";
+  return '<div class="hit"><div class="top"><span class="plat">' + esc(s.type || "signal") +
+    '</span><span class="tag">' + esc(s.confidence || "unknown") + "</span></div>" +
+    '<div class="who">' + esc(s.value || "") + "</div>" +
+    '<div class="url">' + esc(s.source || "") + (s.note ? " · " + esc(s.note) : "") + "</div>" +
+    url + "</div>";
+}
+
+function renderCountry(j) {
+  const s = j.scope || {};
+  const live = s.live || {};
+  const sigs = (s.signals || []).slice();
+  const liveRows = Object.entries(live).map(([k, v]) => {
+    const status = (v || {}).status || ((v || {}).count != null ? "ok" : "unknown");
+    const count = (v || {}).count != null ? " · " + v.count + " results" : "";
+    const note = (v || {}).error || (v || {}).note || "";
+    return '<div class="hit"><div class="top"><span class="plat">live · ' + esc(k) +
+      '</span><span class="tag">' + esc(status) + count + "</span></div>" +
+      '<div class="url">' + esc(note || "public API check") + "</div></div>";
+  });
+  $("countrySummary").innerHTML = [
+    ["match", s.match || "unknown"],
+    ["signals", sigs.length],
+    ["source links", (j.sources || []).length],
+    ["country", (j.country || {}).name || "—"],
+  ].map(([l, v]) => '<div class="stat"><div class="v">' + esc(v) + '</div><div class="l">' + esc(l) + "</div></div>").join("");
+  $("countrySignals").innerHTML = sigs.map(countrySignalCard).concat(liveRows).join("") ||
+    '<div class="empty">No live country signal. Use the source links for manual checks.</div>';
+  $("countrySources").innerHTML = (j.sources || []).map(src =>
+    '<div class="hit"><div class="top"><span class="plat">' + esc(src.label || "source") +
+    '</span><span class="tag">' + esc(src.name || "") + "</span></div>" +
+    '<div class="url mono"><a href="' + esc(src.url) + '" target="_blank" rel="noopener">' +
+    esc(src.url) + "</a></div>" +
+    (src.query_scoped ? "" : '<div class="url">portal link — run the query inside the source</div>') +
+    "</div>").join("") || '<div class="empty">No source links.</div>';
+  $("countryOut").textContent = JSON.stringify(j, null, 2);
+}
+
+async function runCountryScope() {
+  if (!state.token) { $("countryStatus").textContent = "login required"; return; }
+  const query = $("countryQuery").value.trim();
+  if (!query) { $("countryStatus").textContent = "target required"; return; }
+  const btn = $("countryGo");
+  btn.disabled = true; btn.textContent = "Scoping…";
+  $("countryStatus").innerHTML = '<span class="spinner"></span>checking country sources…';
+  try {
+    const j = await api("/api/countryscope/search", {
+      method: "POST", body: {
+        query, country: $("countrySelect").value,
+        case_id: $("countryCase").value ? Number($("countryCase").value) : undefined,
+      },
+    });
+    renderCountry(j);
+    $("countryStatus").textContent = "scoped · " + (j.kind || "target") + " · " +
+      ((j.country || {}).name || "") + " · match " + ((j.scope || {}).match || "unknown") +
+      (j.country_inferred ? " · country auto-detected" : "");
+  } catch (e) {
+    $("countryOut").textContent = JSON.stringify(e.data || { error: e.message }, null, 2);
+    $("countrySummary").innerHTML = "";
+    if ((e.data || {}).status === "needs_country") {
+      $("countryStatus").textContent = "choose a country for a name/company query";
+      loadCountries();
+    } else {
+      $("countryStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = "Scope target";
+  }
+}
+
+/* ------------------------------------------------------------------ records */
+$("procGo").onclick = runProcurement;
+$("lobGo").onclick = runLobbying;
+$("npGo").onclick = runNonprofitSearch;
+$("npEinGo").onclick = runNonprofitEin;
+
+async function runProcurement() {
+  if (!state.token) { $("procStatus").textContent = "login required"; return; }
+  const query = $("procQuery").value.trim();
+  if (!query) { $("procStatus").textContent = "query required"; return; }
+  $("procStatus").innerHTML = '<span class="spinner"></span>searching procurement…';
+  try {
+    const j = await api("/api/procurement/search", {
+      method: "POST", body: {
+        query, country: $("procCountry").value, limit: 10,
+        case_id: $("recordsCase").value ? Number($("recordsCase").value) : undefined,
+      },
+    });
+    $("procOut").textContent = JSON.stringify(j, null, 2);
+    $("procStatus").textContent = (j.status || "ok") + " · " + (j.count || 0) + " results";
+  } catch (e) {
+    $("procStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  }
+}
+
+async function runLobbying() {
+  if (!state.token) { $("lobStatus").textContent = "login required"; return; }
+  const query = $("lobQuery").value.trim();
+  if (!query) { $("lobStatus").textContent = "query required"; return; }
+  const year = $("lobYear").value.trim();
+  $("lobStatus").innerHTML = '<span class="spinner"></span>searching LDA filings…';
+  try {
+    const j = await api("/api/lobbying/search", {
+      method: "POST", body: {
+        query, year: year || undefined, limit: 25,
+        case_id: $("recordsCase").value ? Number($("recordsCase").value) : undefined,
+      },
+    });
+    $("lobOut").textContent = JSON.stringify(j, null, 2);
+    $("lobStatus").textContent = (j.status || "ok") + " · " + (j.count || 0) + " filings";
+  } catch (e) {
+    $("lobStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  }
+}
+
+async function runNonprofitSearch() {
+  if (!state.token) { $("npStatus").textContent = "login required"; return; }
+  const query = $("npQuery").value.trim();
+  if (!query) { $("npStatus").textContent = "query required"; return; }
+  const stateCode = $("npState").value.trim();
+  $("npStatus").innerHTML = '<span class="spinner"></span>searching nonprofits…';
+  try {
+    const j = await api("/api/nonprofit/search", {
+      method: "POST", body: {
+        query, state: stateCode || undefined, limit: 20,
+        case_id: $("recordsCase").value ? Number($("recordsCase").value) : undefined,
+      },
+    });
+    $("npOut").textContent = JSON.stringify(j, null, 2);
+    $("npStatus").textContent = (j.status || "ok") + " · " + (j.count || 0) + " organizations";
+  } catch (e) {
+    $("npStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  }
+}
+
+async function runNonprofitEin() {
+  if (!state.token) { $("npEinStatus").textContent = "login required"; return; }
+  const ein = $("npEin").value.trim();
+  if (!ein) { $("npEinStatus").textContent = "EIN required"; return; }
+  $("npEinStatus").innerHTML = '<span class="spinner"></span>looking up EIN…';
+  try {
+    const cid = $("recordsCase").value;
+    const j = await api("/api/nonprofit/org/" + encodeURIComponent(ein) +
+                        (cid ? "?case_id=" + encodeURIComponent(cid) : ""));
+    $("npOrgOut").textContent = JSON.stringify(j, null, 2);
+    $("npEinStatus").textContent = (j.status || "ok") + " · " +
+      ((j.organization || {}).name || j.ein || "");
+  } catch (e) {
+    $("npEinStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  }
+}
+
+/* ------------------------------------------------------------------ utils */
+async function copyJSON(obj, statusId) {
+  if (!obj) return;
+  const text = JSON.stringify(obj, null, 2);
+  try {
+    await navigator.clipboard.writeText(text);
+    if (statusId) { $(statusId).textContent = "copied"; setTimeout(() => { if ($(statusId)) $(statusId).textContent = ""; }, 1800); }
+  } catch {
+    if (statusId) $(statusId).textContent = "clipboard unavailable";
+  }
+}
+function downloadJSON(obj, name) {
+  if (!obj) return;
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = (name || "xaxglog") + "-" + new Date().toISOString().replace(/[:.]/g, "-") + ".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+/* ------------------------------------------------------------------ boot */
+api("/api/health").then(j => {
+  const on = Object.entries(j.modules || {}).filter(([, v]) => v).map(([k]) => k);
+  $("health").textContent = "backend ok · " + on.length + " modules";
+  $("health").title = on.join(" + ");
+  $("health").className = "badge ok";
+}).catch(() => { $("health").textContent = "backend unreachable"; $("health").className = "badge err"; });
+</script>
+</body>
+</html>

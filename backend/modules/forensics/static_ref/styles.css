@@ -1,0 +1,113 @@
+body{
+  background-color: rgb(240, 240, 240);
+}
+.blurb{
+  margin-bottom: 20px;
+}
+
+button {
+  border: 1px solid #004165;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  margin: 4px 2px;
+  cursor: pointer;
+  border-radius: 5px;
+  background-color: #F9F9F9;
+  color: #004165;
+}
+input[type="text"] {
+  padding: 10px;
+  font-size: 16px;
+  border: 2px solid #ccc;
+  border-radius: 5px;
+  outline: none;
+}
+
+input[type="file"]::file-selector-button {
+  border: 1px solid #004165;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  cursor: pointer;
+  border-radius: 1px;
+  background-color: #F9F9F9;
+  color: #004165;
+}
+
+.input-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: normal;
+  height: 100%;
+}
+.inputs {
+  display: flex;
+  width: 100%; 
+  justify-content: space-between;
+  margin: 0 auto 2.5% auto;
+}
+form {
+  background-color: #ffffff;
+  border: 1px solid #ddd;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  width: 1000px;
+  margin: 0 10px; /* Adjust this property as needed */
+}
+
+.container {
+  display: flex;
+  flex-direction: column; 
+  text-align: center; 
+  align-items: center;
+}
+.credits {
+  position: absolute;
+  bottom: 0px;
+}
+
+html {
+  font-family: 'Segoe UI', sans-serif;
+
+}
+h2{
+  color: #004165;
+  font-family: 'Segoe UI 700', sans-serif;
+  margin-bottom: -5%;
+}
+
+
+
+.loading-screen {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.8);
+  justify-content: center;
+  align-items: center;
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.quote-container {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.quote {
+  font-style: italic;
+}
