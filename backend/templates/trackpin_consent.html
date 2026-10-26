@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>TrackPin — consent check-in</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;
+  background:radial-gradient(900px 500px at 30% 0%,#17304f 0%,#070b12 60%) no-repeat,#070b12;
+  color:#e6edf3;font:15px/1.55 system-ui,Segoe UI,Roboto,sans-serif}
+.card{width:min(620px,100%);background:#0e1522;border:1px solid #223047;border-radius:16px;padding:26px;
+  box-shadow:0 24px 80px rgba(0,0,0,.45)}
+.logo{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-weight:800;font-size:22px;
+  background:linear-gradient(135deg,#1f6feb,#8957e5);margin-bottom:14px}
+h1{margin:0 0 4px;font-size:22px}h1 span{color:#58a6ff}
+.sub{color:#8b98a9;font-size:13px;margin-bottom:18px}
+.box{background:#0b1220;border:1px solid #223047;border-radius:10px;padding:14px;margin:12px 0}
+.k{color:#8b98a9;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+.v{font-weight:650;margin-top:2px;word-break:break-word}
+label.check{display:flex;gap:10px;align-items:flex-start;margin:16px 0;font-size:13px;color:#c9d1d9}
+input[type=checkbox]{width:18px;height:18px;margin-top:2px;accent-color:#1f6feb}
+button{width:100%;border:1px solid #1f6feb;background:#1f6feb;color:#fff;border-radius:10px;padding:13px 16px;
+  font:inherit;font-weight:700;cursor:pointer}
+button:disabled{opacity:.55;cursor:wait}
+button.ghost{background:transparent;border-color:#2a3a52;color:#8b98a9;font-weight:600}
+.status{margin-top:14px;font-size:13px;min-height:22px}
+.ok{color:#7ee787}.err{color:#ff7b72}.muted{color:#8b98a9}
+.spinner{width:16px;height:16px;border:2px solid #2a3a52;border-top-color:#58a6ff;border-radius:50%;
+  display:inline-block;animation:spin .9s linear infinite;vertical-align:-3px;margin-right:7px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.note{color:#8b98a9;font-size:11.5px;line-height:1.5;margin-top:16px;border-top:1px solid #223047;padding-top:14px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">X</div>
+  <h1>TrackPin <span>// consent check-in</span></h1>
+  <div class="sub">A one-time location check-in. You decide whether to share.</div>
+
+  <div id="info"><span class="spinner"></span>Loading request…</div>
+
+  <div id="form" class="hidden">
+    <label class="check">
+      <input type="checkbox" id="consent"/>
+      <span>I explicitly consent to share my current device location once with the
+      requesting case team. I understand this is voluntary and the link can be used only once.</span>
+    </label>
+    <button id="share" disabled>Share my current location</button>
+    <button id="deny" class="ghost" style="margin-top:8px">No thanks</button>
+    <div id="status" class="status"></div>
+  </div>
+
+  <div class="note">
+    <strong>Privacy:</strong> the page asks your browser for location only after you press the button.
+    Nothing is sent before that. The one-time link expires automatically. The requesting team stores
+    the point with a consent flag, timestamp, accuracy and audit/evidence hash. If you do not consent,
+    close this page — no location is collected.
+  </div>
+</div>
+<script>
+const token = {{ token|tojson }};
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+async function load() {
+  try {
+    const r = await fetch("/api/trackpin/consent/" + encodeURIComponent(token));
+    const j = await r.json();
+    if (!j.valid) {
+      $("info").innerHTML = '<div class="box"><div class="k">Request unavailable</div><div class="v err">' + esc(j.error || "invalid link") + '</div></div>';
+      return;
+    }
+    $("info").innerHTML =
+      '<div class="box"><div class="k">Request</div><div class="v">' + esc(j.label) + '</div></div>' +
+      '<div class="box"><div class="k">Expires</div><div class="v">' + esc(j.expires || "—") + '</div></div>' +
+      '<div class="muted" style="font-size:12.5px">' + esc(j.notice || "") + '</div>';
+    $("form").classList.remove("hidden");
+    $("consent").onchange = () => { $("share").disabled = !$("consent").checked; };
+  } catch (e) {
+    $("info").innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+  }
+}
+
+$("deny").onclick = () => {
+  $("form").classList.add("hidden");
+  $("info").innerHTML = '<div class="box"><div class="k">No location shared</div><div class="v ok">You declined. Nothing was collected.</div></div>';
+};
+
+$("share").onclick = () => {
+  if (!$("consent").checked) return;
+  if (!navigator.geolocation) {
+    $("status").innerHTML = '<span class="err">This browser does not support geolocation.</span>';
+    return;
+  }
+  $("share").disabled = true;
+  $("status").innerHTML = '<span class="spinner"></span>Requesting device location…';
+  navigator.geolocation.getCurrentPosition(async pos => {
+    $("status").innerHTML = '<span class="spinner"></span>Sending one-time check-in…';
+    try {
+      const r = await fetch("/api/trackpin/consent/" + encodeURIComponent(token), {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          consent: true,
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+          accuracy_m: pos.coords.accuracy,
+          note: "browser consent check-in"
+        })
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+      $("form").classList.add("hidden");
+      $("info").innerHTML = '<div class="box"><div class="k">Shared with consent</div><div class="v ok">' +
+        esc(j.message || "Location shared.") + '</div><div class="muted" style="font-size:12px;margin-top:6px">Point #' +
+        esc(j.point?.id || "") + ' · accuracy ±' + esc(Math.round(j.point?.accuracy_m || 0)) + ' m</div></div>';
+    } catch (e) {
+      $("share").disabled = false;
+      $("status").innerHTML = '<span class="err">' + esc(e.message) + '</span>';
+    }
+  }, err => {
+    $("share").disabled = false;
+    $("status").innerHTML = '<span class="err">Location permission denied or unavailable: ' + esc(err.message) + '</span>';
+  }, {enableHighAccuracy: true, timeout: 15000, maximumAge: 0});
+};
+load();
+</script>
+</body>
+</html>

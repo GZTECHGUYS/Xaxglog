@@ -25,6 +25,7 @@ import json
 import re
 import socket
 import urllib.parse
+import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
@@ -38,6 +39,61 @@ MAX_REDIRECTS = 4
 
 SAFE_USER_RE = re.compile(r'^[A-Za-z0-9_.\-]{2,39}$')
 NAME_RE = re.compile(r"^[^\W\d_][\w'’.\-]*(?:\s+[^\W\d_][\w'’.\-]*){0,7}$", re.UNICODE)
+
+
+def name_variants(name):
+    """Generate a few alternate orderings for a free-form name.
+
+    Used only as a fallback when the exact display name returns nothing, so a
+    profile stored as "Doe, Jane" or "J. Doe" is not silently missed.
+    """
+    name = re.sub(r"\s+", " ", (name or "").strip())
+    parts = [p for p in name.split() if p]
+    if len(parts) < 2:
+        return []
+    first, last = parts[0], parts[-1]
+    candidates = []
+    if len(parts) > 2:
+        candidates.append(first + " " + last)
+    candidates += [
+        last + " " + first,
+        first[0] + " " + last,
+        first[0] + ". " + last,
+        first + " " + last[0] + ".",
+    ]
+    out = []
+    for cand in candidates:
+        cand = re.sub(r"\s+", " ", cand).strip()
+        if (cand and cand.lower() != name.lower() and cand not in out
+                and NAME_RE.fullmatch(cand)):
+            out.append(cand)
+    return out[:4]
+
+
+def handle_candidates(name):
+    """Name/handle -> public-handle spelling variants.
+
+    Returns the normalized base first, then common dot/underscore/dash and
+    initial forms. These are suggestions and fallback probes, not identity
+    proof; homonyms are common.
+    """
+    parts = re.findall(r"[A-Za-z0-9]+", name or "")
+    if not parts:
+        return []
+    if len(parts) == 1:
+        base = parts[0].lower()
+        return [base] if SAFE_USER_RE.match(base) else []
+    first, last = parts[0].lower(), parts[-1].lower()
+    candidates = [
+        first + last, first + "." + last, first + "_" + last,
+        first + "-" + last, first[0] + last,
+        first[0] + "." + last, first[0] + "_" + last,
+    ]
+    out = []
+    for cand in candidates:
+        if cand and cand not in out and SAFE_USER_RE.match(cand):
+            out.append(cand)
+    return out
 
 # (name, url template, category, region)
 # Categories: social, code, professional, creative, video, music, gaming,
@@ -366,6 +422,9 @@ def check_username(username, categories=None, max_workers=20):
     by_cat = {}
     for h in hits:
         by_cat.setdefault(h.get("category", "other"), []).append(h)
+    status_counts = {}
+    for r in results:
+        status_counts[r.get("status")] = status_counts.get(r.get("status"), 0) + 1
     return {
         "input": username,
         "checked": len(results),
@@ -374,6 +433,21 @@ def check_username(username, categories=None, max_workers=20):
         "by_category": {k: sorted(v, key=lambda x: x["platform"])
                         for k, v in sorted(by_cat.items())},
         "all": sorted(results, key=lambda x: x["platform"]),
+        "coverage": {
+            "mode": "handle",
+            "total_platforms": len(PLATFORMS),
+            "checked": len(results),
+            "not_checked": len(PLATFORMS) - len(results),
+            "found": len(hits),
+            "by_status": status_counts,
+            "found_platforms": sorted(h["platform"] for h in hits),
+            "categories": sorted(wanted) if wanted else "all",
+            "note": (("Every configured platform was probed with this exact "
+                      "handle. " if wanted is None else
+                      "Only the selected categories were probed. ")
+                     + "'blocked' means an anti-bot/login wall prevented a "
+                       "public check; it is not proof the profile is absent."),
+        },
     }
 
 
@@ -724,6 +798,143 @@ def _people_gdelt(name):
             for a in rows[:8]]
 
 
+def _people_crossref(name):
+    """Crossref author mentions (works metadata, keyless public API)."""
+    r = _get("https://api.crossref.org/works", params={
+        "query.author": name, "rows": 20,
+        "select": "author,title,DOI,published"})
+    if isinstance(r, Exception):
+        raise RuntimeError(str(r)[:120])
+    if r.status_code != 200:
+        raise RuntimeError("http %s" % r.status_code)
+    items = ((r.json() or {}).get("message") or {}).get("items") or []
+    out, seen = [], set()
+    for item in items:
+        for a in item.get("author") or []:
+            full = " ".join(x for x in (a.get("given"), a.get("family")) if x) \
+                   or (a.get("name") or "")
+            if not full or _match_score(name, full) < 0.5:
+                continue
+            key = (a.get("ORCID") or full).lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            affiliations = [x.get("name") for x in (a.get("affiliation") or [])
+                            if isinstance(x, dict) and x.get("name")]
+            orcid = (a.get("ORCID") or "").rstrip("/").split("/")[-1]
+            out.append({
+                "name": full, "orcid": orcid or None,
+                "affiliations": affiliations,
+                "url": a.get("ORCID") or (
+                    "https://doi.org/" + item.get("DOI") if item.get("DOI") else ""),
+                "match": _match_score(name, full),
+            })
+    return sorted(out, key=lambda x: -x["match"])[:8]
+
+
+def _people_arxiv(name):
+    """arXiv author search (Atom XML, keyless)."""
+    r = _get("https://export.arxiv.org/api/query", params={
+        "search_query": 'au:"%s"' % name, "start": 0, "max_results": 20})
+    if isinstance(r, Exception):
+        raise RuntimeError(str(r)[:120])
+    if r.status_code != 200:
+        raise RuntimeError("http %s" % r.status_code)
+    try:
+        root = ET.fromstring(r.text)
+    except Exception as e:
+        raise RuntimeError("parse: %s" % str(e)[:100])
+    ns = "{http://www.w3.org/2005/Atom}"
+    out, seen = [], set()
+    for entry in root.findall(ns + "entry"):
+        published = (entry.findtext(ns + "published") or "")[:10]
+        for author in entry.findall(ns + "author"):
+            full = (author.findtext(ns + "name") or "").strip()
+            if not full or full.lower() in seen:
+                continue
+            if _match_score(name, full) < 0.5:
+                continue
+            seen.add(full.lower())
+            out.append({
+                "name": full,
+                "url": "https://arxiv.org/search/?query=%s&searchtype=author"
+                       % urllib.parse.quote(full),
+                "last_paper": published,
+                "match": _match_score(name, full),
+            })
+    return sorted(out, key=lambda x: -x["match"])[:8]
+
+
+def _people_lemmy(name):
+    """Lemmy federated user search (public API, keyless)."""
+    r = _get("https://lemmy.world/api/v3/search", params={
+        "q": name, "type_": "Users", "limit": 10, "sort": "TopAll"})
+    if isinstance(r, Exception):
+        raise RuntimeError(str(r)[:120])
+    if r.status_code != 200:
+        raise RuntimeError("http %s" % r.status_code)
+    users = (r.json() or {}).get("users") or []
+    out = []
+    for row in users:
+        p = row.get("person") or {}
+        actor = p.get("actor_id") or ""
+        host = urllib.parse.urlsplit(actor).hostname or "lemmy"
+        dn = p.get("display_name") or p.get("name") or ""
+        handle = (p.get("name") or "") + "@" + host
+        out.append({
+            "name": dn or handle, "handle": handle,
+            "bio": _clean(p.get("bio") or ""),
+            "url": actor,
+            "match": _match_score(name, dn + " " + handle),
+        })
+    return sorted(out, key=lambda x: -x["match"])[:8]
+
+
+def _people_stackexchange(name):
+    """Stack Overflow / Stack Exchange user search (public API, keyless)."""
+    r = _get("https://api.stackexchange.com/2.3/users", params={
+        "inname": name, "site": "stackoverflow", "pagesize": 8,
+        "order": "desc", "sort": "reputation"})
+    if isinstance(r, Exception):
+        raise RuntimeError(str(r)[:120])
+    if r.status_code != 200:
+        raise RuntimeError("http %s" % r.status_code)
+    items = (r.json() or {}).get("items") or []
+    out = []
+    for u in items:
+        dn = u.get("display_name") or ""
+        out.append({
+            "name": dn, "handle": dn,
+            "url": u.get("link") or "",
+            "location": u.get("location") or "",
+            "reputation": u.get("reputation"),
+            "match": _match_score(name, dn),
+        })
+    return sorted(out, key=lambda x: -x["match"])[:8]
+
+
+def _people_codeberg(name):
+    """Codeberg (Gitea) user search — public API, keyless."""
+    r = _get("https://codeberg.org/api/v1/users/search", params={
+        "q": name, "limit": 8})
+    if isinstance(r, Exception):
+        raise RuntimeError(str(r)[:120])
+    if r.status_code != 200:
+        raise RuntimeError("http %s" % r.status_code)
+    rows = (r.json() or {}).get("data") or []
+    out = []
+    for u in rows:
+        full = u.get("full_name") or u.get("login") or ""
+        out.append({
+            "name": full, "login": u.get("login"),
+            "url": u.get("html_url") or "",
+            "location": u.get("location") or "",
+            "bio": u.get("description") or "",
+            "match": _match_score(name, full + " " + (u.get("login") or "")),
+        })
+    return sorted(out, key=lambda x: -x["match"])[:8]
+
+
 PEOPLE_SOURCES = {
     "wikidata": _people_wikidata,
     "wikipedia": _people_wikipedia,
@@ -735,11 +946,158 @@ PEOPLE_SOURCES = {
     "bluesky": _people_bluesky,
     "mastodon": _people_mastodon,
     "gdelt": _people_gdelt,
+    "crossref": _people_crossref,
+    "arxiv": _people_arxiv,
+    "lemmy": _people_lemmy,
+    "stackexchange": _people_stackexchange,
+    "codeberg": _people_codeberg,
 }
 
 
-def name_registry_search(name):
-    """Search public people indexes for a free-form full name."""
+NAME_PLATFORM_META = {
+    "github": ("GitHub", "code"),
+    "codeberg": ("Codeberg", "code"),
+    "stackexchange": ("Stack Overflow", "code"),
+    "bluesky": ("Bluesky", "social"),
+    "mastodon": ("Mastodon", "social"),
+    "lemmy": ("Lemmy", "social"),
+    "orcid": ("ORCID", "academic"),
+    "openalex": ("OpenAlex", "academic"),
+    "semantic_scholar": ("Semantic Scholar", "academic"),
+    "openlibrary": ("Open Library", "academic"),
+    "crossref": ("Crossref", "academic"),
+    "arxiv": ("arXiv", "academic"),
+}
+
+
+def name_search_coverage():
+    """Explicit coverage for display-name search across configured platforms.
+
+    A handle check covers all 93 platforms. A *name* check can only use public
+    name-search APIs; the rest require a known handle or profile URL. Reporting
+    that boundary prevents \"missing\" from being mistaken for \"absent\".
+    """
+    platform_names = {n for n, _t, _c, _r in PLATFORMS}
+    all_name_sources = sorted({label for label, _cat in NAME_PLATFORM_META.values()})
+    in_handle_matrix = sorted(set(all_name_sources) & platform_names)
+    additional_indexes = sorted(set(all_name_sources) - platform_names)
+    unsearchable = sorted(platform_names - set(in_handle_matrix))
+    return {
+        "mode": "name",
+        "total_platforms": len(platform_names),
+        "name_searchable": len(in_handle_matrix),
+        "checked_platforms": all_name_sources,
+        "name_search_sources": len(all_name_sources),
+        "handle_matrix_name_searchable": in_handle_matrix,
+        "additional_name_indexes": additional_indexes,
+        "people_index_sources": len(PEOPLE_SOURCES),
+        "not_name_searchable": unsearchable,
+        "note": ("Handle matrix: %d platforms. Display-name APIs cover %d of them "
+                 "directly, plus %d additional academic/profile indexes and %d "
+                 "people-index sources. The other %d platforms require a known "
+                 "handle/profile URL; Xaxglog does not bypass login walls."
+                 % (len(platform_names), len(in_handle_matrix),
+                    len(additional_indexes), len(PEOPLE_SOURCES),
+                    len(unsearchable))),
+    }
+
+
+def normalize_people_platforms(people):
+    """Turn people-index rows into deduplicated public profile cards.
+
+    This is the missing "search by display name, not only by guessed handle"
+    layer: GitHub full-name search, Bluesky/Mastodon/Lemmy actor search,
+    Stack Overflow, Codeberg, ORCID/OpenAlex/Semantic Scholar/Crossref/arXiv.
+    """
+    rows = (people or {}).get("sources") or {}
+    hits, seen = [], set()
+    for src, items in rows.items():
+        meta = NAME_PLATFORM_META.get(src)
+        if not meta:
+            continue
+        platform, category = meta
+        for row in items or []:
+            if not isinstance(row, dict):
+                continue
+            if src == "github":
+                handle = row.get("login") or ""
+                name = row.get("login") or ""
+                url = row.get("url") or ""
+                location = ""
+                bio = ""
+            elif src == "codeberg":
+                handle = row.get("login") or ""
+                name = row.get("name") or handle
+                url = row.get("url") or ""
+                location = row.get("location") or ""
+                bio = row.get("bio") or ""
+            elif src in ("bluesky", "mastodon", "lemmy"):
+                handle = row.get("handle") or row.get("acct") or ""
+                name = row.get("name") or handle
+                url = row.get("url") or ""
+                location = ""
+                bio = row.get("bio") or row.get("description") or ""
+            elif src == "stackexchange":
+                handle = row.get("handle") or row.get("name") or ""
+                name = row.get("name") or handle
+                url = row.get("url") or ""
+                location = row.get("location") or ""
+                bio = "reputation %s" % row.get("reputation") if row.get("reputation") else ""
+            elif src in ("orcid", "openalex", "semantic_scholar", "openlibrary"):
+                handle = row.get("orcid") or row.get("id") or row.get("key") or ""
+                name = row.get("name") or handle
+                url = row.get("url") or ""
+                aff = row.get("institutions") or row.get("affiliations") or []
+                location = ", ".join([x for x in aff if isinstance(x, str)][:3])
+                bio = ""
+            else:  # crossref / arxiv
+                handle = row.get("orcid") or row.get("name") or ""
+                name = row.get("name") or handle
+                url = row.get("url") or ""
+                aff = row.get("affiliations") or []
+                location = ", ".join([x for x in aff if isinstance(x, str)][:3])
+                bio = ""
+            if not (name or handle or url):
+                continue
+            key = (platform + "|" + (handle or url or name)).lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            hits.append({
+                "platform": platform,
+                "category": category,
+                "handle": handle,
+                "name": name,
+                "url": url,
+                "location": location,
+                "bio": bio,
+                "match": row.get("match"),
+                "source": "name_search:" + src,
+                "confidence": "medium" if (row.get("match") or 0) >= 0.5 else "lead",
+            })
+    hits.sort(key=lambda x: (0 if (x.get("match") or 0) >= 0.5 else 1,
+                             -(x.get("match") or 0), x["platform"]))
+    by_platform = {}
+    for h in hits:
+        by_platform.setdefault(h["platform"], []).append(h)
+    return {
+        "checked": len(NAME_PLATFORM_META),
+        "hits": hits,
+        "by_platform": by_platform,
+        "platforms": sorted(by_platform),
+        "note": ("Display-name matches from public platform APIs/indexes. "
+                 "Homonyms are common; verify the person before attribution."),
+    }
+
+
+def name_registry_search(name, variants=True):
+    """Search public people indexes for a free-form full name.
+
+    If the exact name returns nothing, a small set of alternate orderings
+    (``Doe, Jane``, ``J. Doe``, middle-name removal) is tried against the
+    highest-yield public profile APIs. Variant hits are labelled so they are
+    never mistaken for exact matches.
+    """
     name = re.sub(r"\s+", " ", (name or "").strip())
     out = {"input": name, "sources": {}, "counts": {}, "errors": {},
            "status": "ok"}
@@ -761,10 +1119,47 @@ def name_registry_search(name):
                 out["counts"][key] = 0
                 out["errors"][key] = str(e)[:150]
     out["total"] = sum(out["counts"].values())
+    if out["total"] == 0 and variants:
+        alts = name_variants(name)
+        alt_keys = [k for k in ("github", "bluesky", "mastodon", "lemmy",
+                                "stackexchange", "codeberg", "crossref")
+                    if k in PEOPLE_SOURCES]
+        if alts and alt_keys:
+            alt_tasks = {}
+            with ThreadPoolExecutor(max_workers=max(1, len(alt_keys) * min(2, len(alts)))) as ex:
+                for alt in alts[:2]:
+                    for key in alt_keys:
+                        alt_tasks[ex.submit(PEOPLE_SOURCES[key], alt)] = (key, alt)
+                for f in as_completed(alt_tasks):
+                    key, alt = alt_tasks[f]
+                    try:
+                        rows = f.result() or []
+                    except Exception:
+                        continue
+                    rows.sort(key=lambda x: -float(x.get("match") or 0))
+                    existing = out["sources"].setdefault(key, [])
+                    seen = {json.dumps(r, sort_keys=True, default=str)
+                            for r in existing if isinstance(r, dict)}
+                    for row in rows:
+                        if not isinstance(row, dict):
+                            continue
+                        rid = json.dumps(row, sort_keys=True, default=str)
+                        if rid in seen:
+                            continue
+                        seen.add(rid)
+                        row = dict(row)
+                        row["matched_variant"] = alt
+                        existing.append(row)
+                    out["counts"][key] = len(existing)
+            out["variants_tried"] = alts[:2]
+            out["variant_sources"] = alt_keys
+            out["total"] = sum(out["counts"].values())
     if out["total"] == 0:
         out["status"] = "empty" if not out["errors"] else "error"
     elif len(out["errors"]) > len(PEOPLE_SOURCES) // 2:
         out["status"] = "partial"
+    out["platforms"] = normalize_people_platforms(out)
+    out["coverage"] = name_search_coverage()
     return out
 
 
@@ -838,11 +1233,26 @@ def social_footprint(query, include_web=True):
                            "hits": profiles.get("hits", []),
                            "by_category": profiles.get("by_category", {})}
         out["verified"] = verified_accounts(q)
+        out["coverage"] = profiles.get("coverage")
+        signals = []
+        for prof in (out["verified"] or {}).get("verified") or []:
+            if isinstance(prof, dict) and prof.get("location"):
+                signals.append({
+                    "type": "profile_location", "value": prof["location"],
+                    "source": prof.get("platform") or "public profile",
+                    "precision": "profile", "confidence": "medium",
+                    "note": "self-declared public profile location",
+                    "url": prof.get("url") or "",
+                })
+        out["location_signals"] = signals
     else:
         out = {"input": q, "query_type": "name", "status": "ok"}
         people = name_registry_search(q)
         out["people"] = people
+        out["name_platforms"] = people.get("platforms") or {}
         out["status"] = people.get("status", "ok")
+        from .location import name_signals
+        out["location_signals"] = name_signals(people, out["name_platforms"])
     if include_web:
         out["web"] = discover_social(q)
     return out

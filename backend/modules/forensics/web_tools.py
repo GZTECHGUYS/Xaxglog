@@ -1,3 +1,6 @@
+import logging
+
+log = logging.getLogger("xaxglog")
 import http.cookiejar
 import urllib.request
 from urllib.parse import urlparse, urljoin
@@ -180,11 +183,11 @@ def get_sitemaps(website, timeout=5):
         sitemaps = rp.site_maps()
     except error.URLError as e:
         if isinstance(e.reason, socket.timeout):
-            print(f"Timeout Error: {e}")
+            log.warning(f"Timeout Error: {e}")
         else:
-            print(f"URLError: {e}")
+            log.warning(f"URLError: {e}")
     except Exception as e:
-        print(f"Error: {e}")
+        log.warning(f"Error: {e}")
     finally:
         socket.setdefaulttimeout(None)
 
@@ -207,11 +210,11 @@ def sitemap_parser(sitemap):
                 else:
                     urls.append(element)
             except Exception as e:
-                print(f"Error parsing sub-sitemap '{element}': {str(e)}")
+                log.warning(f"Error parsing sub-sitemap '{element}': {str(e)}")
 
         return urls
     except Exception as e:
-        print(f"Error accessing sitemap '{sitemap}': {str(e)}")
+        log.warning(f"Error accessing sitemap '{sitemap}': {str(e)}")
         return []
 
 
@@ -299,7 +302,7 @@ def get_screenshot(url):
         return {"screenshot": screenshot_base64}
 
     except Exception as e:
-        print(f'Error: {e}')
+        log.warning(f'Error: {e}')
 
     finally:
         # Close the WebDriver

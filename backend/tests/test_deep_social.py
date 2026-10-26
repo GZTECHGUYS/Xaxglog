@@ -125,5 +125,75 @@ class RegistryTests(unittest.TestCase):
         self.assertFalse(rec["exists"])
 
 
+class NamePlatformTests(unittest.TestCase):
+    def test_normalizes_display_name_hits_and_dedupes(self):
+        people = {"sources": {
+            "github": [{"login": "jane", "url": "https://github.com/jane", "match": 1.0}],
+            "bluesky": [{"handle": "jane.bsky.social", "name": "Jane Doe",
+                         "url": "https://bsky.app/profile/jane.bsky.social", "match": 1.0}],
+            "wikipedia": [{"title": "Jane Doe", "url": "https://en.wikipedia.org/wiki/Jane_Doe"}],
+        }}
+        out = social.normalize_people_platforms(people)
+        self.assertEqual(out["checked"], len(social.NAME_PLATFORM_META))
+        self.assertIn("GitHub", out["platforms"])
+        self.assertIn("Bluesky", out["platforms"])
+        self.assertNotIn("Wikipedia", out["platforms"])
+        self.assertEqual(len(out["hits"]), 2)
+
+    def test_new_people_indexes_registered(self):
+        for key in ("crossref", "arxiv", "lemmy", "stackexchange", "codeberg"):
+            self.assertIn(key, social.PEOPLE_SOURCES)
+
+    def test_name_and_handle_variants(self):
+        variants = social.name_variants("Jane A. Doe")
+        self.assertIn("Jane Doe", variants)
+        self.assertIn("Doe Jane", variants)
+        self.assertIn("J Doe", variants)
+        handles = social.handle_candidates("Jane Doe")
+        self.assertIn("janedoe", handles)
+        self.assertIn("jane.doe", handles)
+        self.assertIn("jane_doe", handles)
+        self.assertIn("jdoe", handles)
+
+    def test_name_search_coverage_reports_boundary(self):
+        cov = social.name_search_coverage()
+        self.assertEqual(cov["total_platforms"], len(social.PLATFORMS))
+        self.assertTrue(cov["checked_platforms"])
+        self.assertIn("GitHub", cov["checked_platforms"])
+        self.assertGreater(len(cov["not_name_searchable"]), 0)
+
+
+class LocationSignalTests(unittest.TestCase):
+    def test_phone_signals_are_labeled_coarse(self):
+        try:
+            import phonenumbers  # noqa: F401
+        except ImportError:
+            self.skipTest("phonenumbers not installed")
+        from modules.deep_search import location
+        out = location.phone_signals("+14155552671")
+        self.assertEqual(out["precision"], "coarse")
+        self.assertTrue(out["signals"])
+        self.assertTrue(any(s["type"] == "phone_region" for s in out["signals"]))
+        self.assertIn("not GPS", out["disclaimer"])
+
+    def test_profile_signals_extract_jsonld_address(self):
+        from modules.deep_search import location
+        scraped = {
+            "status": "ok", "url": "https://example.com/jane", "name": "Jane Doe",
+            "jsonld": [{"@type": "Person", "name": "Jane Doe",
+                        "address": {"addressLocality": "Berlin",
+                                    "addressCountry": "DE"}}],
+            "og": {},
+        }
+        signals = location.profile_signals(scraped)
+        self.assertTrue(any(s["type"] == "profile_address" and "Berlin" in s["value"]
+                            for s in signals))
+
+    def test_location_search_empty_query_is_graceful(self):
+        out = connectors.location_search("", include_profiles=False)
+        self.assertEqual(out["status"], "error")
+        self.assertIn("error", out)
+
+
 if __name__ == "__main__":
     unittest.main()

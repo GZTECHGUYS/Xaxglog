@@ -207,14 +207,17 @@ def due_watchlists():
     import datetime
     c = db.get_db()
     rows = [dict(r) for r in c.execute("SELECT * FROM watchlist WHERE enabled=1").fetchall()]
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     due = []
     for r in rows:
         if not r.get("last_run"):
             due.append(r)
             continue
         try:
-            last = datetime.datetime.fromisoformat(r["last_run"].replace("Z", ""))
+            last = datetime.datetime.fromisoformat(
+                r["last_run"].replace("Z", "+00:00"))
+            if last.tzinfo is None:
+                last = last.replace(tzinfo=datetime.timezone.utc)
             if (now - last).total_seconds() >= r["interval_min"] * 60:
                 due.append(r)
         except Exception:

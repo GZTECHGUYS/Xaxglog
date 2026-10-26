@@ -34,7 +34,8 @@ else:
 # there's also an option to disable the SSL warning:
 try:
     import requests.packages.urllib3
-    requests.packages.urllib3.disable_warnings()
+    requests.packages.urllib3.disable_warnings(
+        requests.packages.urllib3.exceptions.InsecureRequestWarning)
 except:
     pass
 
@@ -72,7 +73,7 @@ def no_color():
 
 
 def banner():
-    print("""%s
+    print(r"""%s
                  ____        _     _ _     _   _____
                 / ___| _   _| |__ | (_)___| |_|___ / _ __
                 \___ \| | | | '_ \| | / __| __| |_ \| '__|

@@ -18,6 +18,9 @@ the previous one, and raises typed alerts into the shared alerts pipeline.
     news_watch      | GDELT article volume for a query          | api.gdeltproject.org
     telegram_watch  | public-channel post ids                   | t.me/s/<channel>
     sanctions_watch | presence on multi-list sanctions          | OFAC+UN+OFSI+EU (sanx)
+    new_contact     | new frequent contact on an entity           | pattern interaction store
+    contact_drop    | contact left the frequent-contact list     | pattern interaction store
+    cadence_change  | posting cadence / peak-hour shift           | pattern interaction store
 
 Lawful-use note: every tracker reads public sources or Xaxglog's own custody
 store; no credential logins, no authority-gated lookups are performed here.
@@ -454,21 +457,26 @@ def _fp_sanctions_diff(old, new, target):
     return alerts
 
 
-# ================================================================ pattern tracker kinds (ROADMAP_PART3 W3/W5/W6)
+# ---------------------------------------------------------------- pattern
 def _fp_new_contact(target, case_id=None):
-    import modules.pattern.pattern as PAT
-    snap = PAT.tracker_snapshot(target, case_id)
-    if snap.get("status") != "ok":
-        return snap
-    return {"status": "ok", "contacts": snap.get("contacts", []),
-            "per_day": snap.get("per_day"), "sample": snap.get("sample")}
+    try:
+        import modules.pattern.pattern as PAT
+        snap = PAT.tracker_snapshot(target, case_id)
+        if snap.get("status") != "ok":
+            return snap
+        return {"status": "ok", "contacts": snap.get("contacts", []),
+                "per_day": snap.get("per_day"), "sample": snap.get("sample")}
+    except Exception as e:
+        return {"status": "error", "error": str(e)[:150]}
 
 
 def _fp_new_contact_diff(old, new, target):
     alerts = []
-    added, _ = _list_diff((old or {}).get("contacts"), (new or {}).get("contacts"))
-    if added and (old or {}).get("contacts"):  # first run only sets baseline
-        alerts.append(_alert("medium", f"new_contact [{target}]: {len(added)} new frequent contacts",
+    added, _ = _list_diff((old or {}).get("contacts", []),
+                          (new or {}).get("contacts", []))
+    if added and (old or {}).get("contacts"):  # first run establishes baseline
+        alerts.append(_alert("medium",
+                             f"new_contact [{target}]: {len(added)} new frequent contacts",
                              {"added": added[:8]}))
     return alerts
 
@@ -479,85 +487,36 @@ def _fp_contact_drop(target, case_id=None):
 
 def _fp_contact_drop_diff(old, new, target):
     alerts = []
-    _, removed = _list_diff((old or {}).get("contacts"), (new or {}).get("contacts"))
+    _, removed = _list_diff((old or {}).get("contacts", []),
+                            (new or {}).get("contacts", []))
     if removed:
-        alerts.append(_alert("low", f"contact_drop [{target}]: {len(removed)} contacts left the frequent list",
+        alerts.append(_alert("low",
+                             f"contact_drop [{target}]: {len(removed)} contacts left the frequent list",
                              {"removed": removed[:8]}))
     return alerts
 
 
 def _fp_cadence_change(target, case_id=None):
-    import modules.pattern.pattern as PAT
-    snap = PAT.tracker_snapshot(target, case_id)
-    if snap.get("status") != "ok":
-        return snap
-    return {"status": "ok", "per_day": snap.get("per_day"),
-            "peak_hour_utc": snap.get("peak_hour_utc")}
+    try:
+        import modules.pattern.pattern as PAT
+        snap = PAT.tracker_snapshot(target, case_id)
+        if snap.get("status") != "ok":
+            return snap
+        return {"status": "ok", "per_day": snap.get("per_day"),
+                "peak_hour_utc": snap.get("peak_hour_utc")}
+    except Exception as e:
+        return {"status": "error", "error": str(e)[:150]}
 
 
 def _fp_cadence_change_diff(old, new, target):
-    import modules.pattern.pattern as PAT
-    alerts = PAT.tracker_diff(old, new, mode="cadence_change")
-    for a in alerts:
-        a["message"] = f"cadence_change [{target}]: {a['message'].split(':', 1)[-1].strip()}"
-    return alerts
-
-
-def _fp_geo_pin(target, case_id=None):
-    import modules.geo.pins as PINS
-    return PINS.fingerprint(target, case_id)
-
-
-def _fp_geo_pin_diff(old, new, target):
-    import modules.geo.pins as PINS
-    return PINS.diff(old, new, target)
-
-
-def _fp_route_change(target, case_id=None):
-    """BGP origin/ASN of an IP or prefix via RIPEstat (keyless), BGPView fallback."""
-    res = None
-    r = _get(f"https://stat.ripe.net/data/network-info/data.json?resource={target}")
-    if not isinstance(r, Exception) and r.status_code == 200:
-        try:
-            j = r.json().get("data") or {}
-            asns = sorted(str(a) for a in (j.get("asns") or []))
-            prefix = j.get("prefix")
-            res = {"asns": asns, "prefix": prefix}
-        except Exception:
-            res = None
-    if res is None:
-        r2 = _get(f"https://api.bgpview.io/ip/{target}")
-        if not isinstance(r2, Exception) and r2.status_code == 200:
-            try:
-                d = (r2.json() or {}).get("data") or {}
-                origins = []
-                for pfx in (d.get("prefixes") or []):
-                    origins.append({"asn": pfx.get("asn"), "name": (pfx.get("asn_description") or "")[:80],
-                                    "prefix": pfx.get("prefix")})
-                res = {"asns": sorted({str(o["asn"]) for o in origins if o["asn"]}),
-                       "prefixes": origins}
-            except Exception:
-                res = None
-    if res is None:
-        return {"status": "error", "error": "route data unavailable"}
-    return {"status": "ok", **res}
-
-
-def _fp_route_change_diff(old, new, target):
-    alerts = []
-    o_asns = set((old or {}).get("asns") or [])
-    n_asns = set((new or {}).get("asns") or [])
-    if o_asns and n_asns and o_asns != n_asns:
-        added, removed = sorted(n_asns - o_asns), sorted(o_asns - n_asns)
-        alerts.append(_alert("high", f"route_change [{target}]: BGP origin shifted",
-                             {"asn_added": added, "asn_removed": removed,
-                              "old_prefix": (old or {}).get("prefix"),
-                              "new_prefix": (new or {}).get("prefix")}))
-    if (old or {}).get("prefix") and (new or {}).get("prefix") and \
-            (old or {}).get("prefix") != (new or {}).get("prefix"):
-        alerts.append(_alert("medium", f"route_change [{target}]: announced prefix changed",
-                             {"old": (old or {}).get("prefix"), "new": (new or {}).get("prefix")}))
-    return alerts
+    try:
+        import modules.pattern.pattern as PAT
+        alerts = PAT.tracker_diff(old, new, mode="cadence_change")
+        for a in alerts:
+            a["message"] = f"cadence_change [{target}]: {a['message'].split(':', 1)[-1].strip()}"
+        return alerts
+    except Exception:
+        return []
 
 
 # ================================================================ registry
@@ -584,17 +543,12 @@ TRACKERS = {
                         "fp": _fp_telegram, "diff": _fp_telegram_diff},
     "sanctions_watch": {"label": "Multi-list sanctions presence", "target_hint": "name (no confusion)", "interval": 1440,
                         "fp": _fp_sanctions, "diff": _fp_sanctions_diff},
-    # ROADMAP_PART3 — pattern tracker kinds
     "new_contact":     {"label": "Pattern: new frequent contact", "target_hint": "entity (handle/person)", "interval": 720,
                         "fp": _fp_new_contact, "diff": _fp_new_contact_diff},
     "contact_drop":    {"label": "Pattern: contact left frequent list", "target_hint": "entity (handle/person)", "interval": 1440,
                         "fp": _fp_contact_drop, "diff": _fp_contact_drop_diff},
     "cadence_change":  {"label": "Pattern: posting cadence / peak-hour shift", "target_hint": "entity (handle/person)", "interval": 720,
                         "fp": _fp_cadence_change, "diff": _fp_cadence_change_diff},
-    "geo_pin":         {"label": "Location pin: items inside geofence", "target_hint": "pin id", "interval": 720,
-                        "fp": _fp_geo_pin, "diff": _fp_geo_pin_diff},
-    "route_change":    {"label": "BGP origin / announced prefix", "target_hint": "ip or prefix", "interval": 360,
-                        "fp": _fp_route_change, "diff": _fp_route_change_diff},
 }
 
 

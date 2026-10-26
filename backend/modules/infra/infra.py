@@ -38,13 +38,14 @@ def ptr_lookup(ip):
 def asn_lookup(ip):
     """ASN + org + hosting via ip-api + Team Cymru origin DNS."""
     out = {"ip": ip}
-    r = _get(f"http://ip-api.com/json/{ip}?fields=status,country,regionName,city,isp,org,as,query,proxy,hosting,reverse")
+    r = _get(f"http://ip-api.com/json/{ip}?fields=status,country,countryCode,regionName,city,isp,org,as,query,proxy,hosting,reverse")
     if not isinstance(r, Exception):
         try:
             j = r.json()
             out.update({"asn": j.get("as"), "org": j.get("org"), "isp": j.get("isp"),
                         "hosting": j.get("hosting"), "proxy": j.get("proxy"),
-                        "country": j.get("country"), "city": j.get("city"),
+                        "country": j.get("country"), "country_code": j.get("countryCode"),
+                        "region": j.get("regionName"), "city": j.get("city"),
                         "reverse": j.get("reverse")})
         except Exception:
             pass

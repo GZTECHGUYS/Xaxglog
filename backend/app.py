@@ -31,6 +31,14 @@ import config as C
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("xaxglog")
 
+# Recon probes intentionally use verify=False against self-signed hosts;
+# suppress only that warning class to keep stdout free of stack noise.
+try:
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+except Exception:
+    pass
+
 app = Flask(__name__, template_folder="templates")
 app.secret_key = C.FLASK_SECRET_KEY
 CORS(app)
@@ -47,8 +55,13 @@ if _admin == 0:
     import os as _os
     _pw = _os.getenv("XAXGLOG_ADMIN_PASSWORD", "xaxglog-admin")
     AUTH.create_user("admin", _pw, "admin")
-    log.warning("Bootstrap admin user created -> username=admin password=%s "
-                "(set XAXGLOG_ADMIN_PASSWORD before first run to change)", _pw)
+    if "XAXGLOG_ADMIN_PASSWORD" in _os.environ:
+        log.warning("Bootstrap admin user created -> username=admin "
+                    "(password sourced from XAXGLOG_ADMIN_PASSWORD, not logged)")
+    else:
+        log.warning("Bootstrap admin user created -> username=admin with the "
+                    "default dev password (set XAXGLOG_ADMIN_PASSWORD before "
+                    "first run, then rotate this credential)")
 
 def _keys():
     return {"HIBP_API_KEY": C.HIBP_API_KEY, "ABUSEIPDB_API_KEY": C.ABUSEIPDB_API_KEY,
@@ -58,6 +71,14 @@ def _keys():
 
 def _user():
     return getattr(request, "xuser", {"username": "system", "role": "admin"})
+
+
+def _as_bool(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value.strip().lower() not in ("0", "false", "no", "off", "")
+    return bool(value)
 
 AUDIT_LOG = os.path.join(C.DATA_DIR, "audit.log")
 
@@ -69,7 +90,8 @@ def audit(action, detail=""):
         pass
 
 # ---------------------------------------------------------------- capability map
-CAPS = {"threat_intel": False, "forensics": False, "runner": True, "catalog": False, "deep_search": True}
+CAPS = {"threat_intel": False, "forensics": False, "runner": True, "catalog": False,
+        "deep_search": True, "trackpin": True}
 TI = FORENSICS = None
 try:
     from modules.deep_search import connectors as DEEP
@@ -146,7 +168,7 @@ def health():
 
 @app.get("/api/modules")
 def modules():
-    return jsonify({
+    out = {
         "threat_intel": {"enabled": CAPS["threat_intel"],
                          "desc": "IOC aggregation (URLhaus/AbuseIPDB/OTX/VT), scoring, lookups, breach, AI briefs, Snort/YARA",
                          "from": "et842/OSINT_APP"},
@@ -162,6 +184,12 @@ def modules():
         "deep_search": {"enabled": CAPS["deep_search"],
                         "desc": "International deep search: username/email/phone/domain/IP/person/name/social profile/company/geo (free-tier, no docker)",
                         "from": "Xaxglog-native"},
+        "location": {"enabled": True,
+                     "desc": "Public location signals: phone region/carrier, Gravatar/profile locations, server/IP geo; precision-labelled with no silent tracking",
+                     "from": "Xaxglog-native"},
+        "trackpin": {"enabled": True,
+                     "desc": "Lawful location workflow: one-time consent check-in link + authority-gated carrier request packet (no covert call/SMS interception)",
+                     "from": "Xaxglog-native"},
         "recon": {"enabled": True, "desc": "Chained deep-recon pipeline engine (domain/IP fan-out, evidence capture, graph emission)", "from": "Xaxglog-native"},
         "deeprecon": {"enabled": True, "desc": "Intense target-aware deep recon: drives crawl/wayback/leak/netblock/takeover/ports + identity/company/vehicle/phone axes recursively", "from": "Xaxglog-native"},
         "trackers": {"enabled": True, "desc": "Change trackers over any subject: DNS, whois, ports, site content, crypto, ALPR, breach/sanctions, GLEIF, news, Telegram — fingerprint + diff + typed alerts", "from": "Xaxglog-native"},
@@ -194,11 +222,12 @@ def modules():
         "ops": {"enabled": True, "desc": "Operations: bulk dataset mirrors, free-API quota budgets, source health probes", "from": "Xaxglog-native"},
         "narrative": {"enabled": True, "desc": "AI evidence briefing: Groq/Gemini with deterministic SHA-256-cited template fallback", "from": "Xaxglog-native"},
         "geoext": {"enabled": True, "desc": "Global geospatial: OSM building/POI footprints, street-level imagery, postal/ZIP geocode", "from": "Xaxglog-native"},
-        "pattern": {"enabled": True, "desc": "Social pattern tracker: entity link store, multi-platform interaction ingest (GitHub/Bluesky/Mastodon/GDELT/Telegram), time-decayed frequent-contact ranking, active-hours/timezone inference, URL+IP ledgers, email thread graph", "from": "Xaxglog-native"},
-        "webintel": {"enabled": True, "desc": "Offensive web intel: tracker/anti-bot stack fingerprint, payment-address harvest, tracking-pixel/canary detector, shortener+campaign decode (SSRF-guarded)", "from": "Xaxglog-native"},
-        "broker": {"enabled": True, "desc": "Data-broker exposure sweep: catalog walk with honest hit/blocked/no-signal statuses + exposure score", "from": "Xaxglog-native"},
-        "pins": {"enabled": True, "desc": "Location pins: persistent geofence bundle (buildings/POIs/aerial/imagery/Shodan/OpenCelliD/news), change diff, SGP4 satellite pass schedule + cloud cover", "from": "Xaxglog-native"},
-    })
+    }
+    # Part 1 + Part 2 modules (routes package; CAPS flipped on registration)
+    for _n, _d in EXTRA_META.items():
+        out[_n] = {"enabled": CAPS.get(_n, False), "desc": _d,
+                   "from": "Xaxglog-native"}
+    return jsonify(out)
 
 # ---------------------------------------------------------------- 1. threat intel passthrough
 # Re-uses upstream logic directly so scoring/collector behaviour is identical.
@@ -516,7 +545,46 @@ def deep_person():
         return err
     data = request.get_json(silent=True) or {}
     q = data.get("query", "")
-    out = DEEP.person_search(q, include_social=bool(data.get("include_social", True)))
+    include_social = _as_bool(data.get("include_social"), True)
+    include_code = data.get("include_code")
+    if isinstance(include_code, str):
+        include_code = _as_bool(include_code, False)
+    elif include_code is not None:
+        include_code = bool(include_code)
+    # Phase 1: route person searches through identity intelligence when it is
+    # available. Keep the legacy person_search shape for existing UI consumers
+    # and attach the richer identity payload alongside it.
+    try:
+        from modules.identity import identity as ID
+        ident = ID.search(
+            q,
+            kind="person",
+            depth=data.get("depth", "standard"),
+            country=data.get("country") or None,
+            include_social=include_social,
+            include_web=_as_bool(data.get("include_web"), True),
+            include_records=_as_bool(data.get("include_records"), True),
+            include_code=include_code,
+            include_link_out=_as_bool(data.get("include_link_out"), True),
+            case_id=data.get("case_id"),
+            user=_user()["username"],
+        )
+        person = (ident.get("sources") or {}).get("people")
+        if isinstance(person, dict):
+            out = dict(person)
+            # ``ident["sources"]["people"]`` is the legacy payload we just
+            # copied; drop it from the attached view to avoid a circular graph.
+            ident_view = {k: v for k, v in ident.items() if k != "sources"}
+            out["identity"] = ident_view
+            out["coverage"] = ident.get("coverage")
+            out["variants"] = ident.get("variants")
+            out["normalized"] = ident.get("normalized")
+            out["identity_results"] = ident.get("results")
+        else:
+            out = ident
+    except Exception as e:
+        out = DEEP.person_search(q, include_social=include_social)
+        out["identity_error"] = str(e)[:180]
     audit("deep.person", q[:80])
     return jsonify(out)
 
@@ -543,12 +611,145 @@ def deep_profile():
     status = 200 if out.get("status") == "ok" else 400
     return jsonify(out), status
 
+@app.post("/api/deep/location")
+def deep_location():
+    err = _need_deep()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    q = (data.get("query") or data.get("target") or "").strip()
+    include_profiles = bool(data.get("include_profiles", True))
+    out = DEEP.location_search(q, include_profiles=include_profiles)
+    audit("deep.location", "%s profiles=%s" % (q[:80], include_profiles))
+    return jsonify(out)
+
+
 @app.get("/api/deep/sources")
 def deep_sources():
     err = _need_deep()
     if err:
         return err
     return jsonify(DEEP.source_catalog())
+
+
+# ---------------------------------------------------------------- 5b. TrackPin (lawful location)
+@app.post("/api/trackpin/operations")
+@AUTH.require("analyst")
+def trackpin_create():
+    import modules.trackpin.trackpin as TP
+    data = request.get_json(silent=True) or {}
+    out = TP.create_operation(
+        data.get("label"), data.get("target"), data.get("mode", "consent_checkin"),
+        data.get("case_id"), data.get("legal_basis", ""), data.get("notes", ""),
+        _user()["username"], data.get("ttl_hours", 24), _user()["role"])
+    if out.get("error"):
+        return jsonify(out), 400
+    token = out.get("consent_token")
+    if token:
+        out["consent_path"] = "/trackpin/consent/" + token
+        out["consent_url"] = request.host_url.rstrip("/") + out["consent_path"]
+    return jsonify(out), 201
+
+
+@app.get("/api/trackpin/operations")
+@AUTH.require("viewer")
+def trackpin_list():
+    import modules.trackpin.trackpin as TP
+    u = _user()
+    return jsonify(TP.list_operations(u["username"], u["role"],
+                                      request.args.get("case_id", type=int)))
+
+
+@app.get("/api/trackpin/operations/<int:op_id>")
+@AUTH.require("viewer")
+def trackpin_get(op_id):
+    import modules.trackpin.trackpin as TP
+    u = _user()
+    out = TP.get_operation(op_id, u["username"], u["role"])
+    if out.get("error"):
+        return jsonify(out), 404 if "not found" in out["error"] else 403
+    return jsonify(out)
+
+
+@app.post("/api/trackpin/operations/<int:op_id>/points")
+@AUTH.require("analyst")
+def trackpin_point(op_id):
+    import modules.trackpin.trackpin as TP
+    data = request.get_json(silent=True) or {}
+    u = _user()
+    out = TP.add_point(
+        op_id, data.get("lat"), data.get("lon"), data.get("accuracy_m"),
+        data.get("source", "manual"), bool(data.get("consent", False)),
+        data.get("note", ""), u["username"], u["role"],
+        request.remote_addr or "", request.headers.get("User-Agent", ""),
+        data.get("captured_at"), data.get("meta"))
+    if out.get("error"):
+        return jsonify(out), 400
+    return jsonify(out)
+
+
+@app.post("/api/trackpin/operations/<int:op_id>/consent-link")
+@AUTH.require("analyst")
+def trackpin_consent_link(op_id):
+    import modules.trackpin.trackpin as TP
+    data = request.get_json(silent=True) or {}
+    u = _user()
+    out = TP.create_consent_link(op_id, u["username"], u["role"],
+                                 data.get("ttl_hours", 24))
+    if out.get("error"):
+        return jsonify(out), 400
+    out["consent_url"] = request.host_url.rstrip("/") + out["path"]
+    return jsonify(out)
+
+
+@app.post("/api/trackpin/operations/<int:op_id>/authority")
+@AUTH.require("analyst")
+def trackpin_authority(op_id):
+    import modules.trackpin.trackpin as TP
+    data = request.get_json(silent=True) or {}
+    u = _user()
+    out = TP.request_authority(
+        op_id, data.get("agency"), data.get("reference"),
+        data.get("legal_basis", ""), u["username"], u["role"],
+        data.get("notes", ""))
+    if out.get("error"):
+        return jsonify(out), 400
+    return jsonify(out)
+
+
+@app.get("/api/trackpin/operations/<int:op_id>/geojson")
+@AUTH.require("viewer")
+def trackpin_geojson(op_id):
+    import modules.trackpin.trackpin as TP
+    u = _user()
+    out = TP.geojson(op_id, u["username"], u["role"])
+    if out.get("error"):
+        return jsonify(out), 404 if "not found" in out["error"] else 403
+    return Response(json.dumps(out), mimetype="application/geo+json")
+
+
+@app.get("/trackpin/consent/<token>")
+def trackpin_consent_page(token):
+    return render_template("trackpin_consent.html", token=token)
+
+
+@app.get("/api/trackpin/consent/<token>")
+def trackpin_consent_info(token):
+    import modules.trackpin.trackpin as TP
+    return jsonify(TP.consent_info(token))
+
+
+@app.post("/api/trackpin/consent/<token>")
+def trackpin_consent_submit(token):
+    import modules.trackpin.trackpin as TP
+    data = request.get_json(silent=True) or {}
+    out = TP.submit_consent(
+        token, data.get("lat"), data.get("lon"), data.get("accuracy_m"),
+        bool(data.get("consent", False)), request.remote_addr or "",
+        request.headers.get("User-Agent", ""), data.get("note", ""))
+    if out.get("error"):
+        return jsonify(out), 400
+    return jsonify(out)
 
 @app.get("/api/deep/company")
 def deep_company():
@@ -1891,230 +2092,14 @@ def gx_aerial():
                                         request.args.get("radius", 300, type=int)))
 
 
-# ---------------------------------------------------------------- 26. social pattern tracker (ROADMAP_PART3 W3)
-@app.get("/api/pattern/sources")
-@AUTH.require("viewer")
-def pattern_sources():
-    import modules.pattern.connectors as PCON
-    return jsonify({"sources": PCON.source_catalog()})
+# ---------------------------------------------------------------- Part 1 + Part 2 module routes
+from routes import EXTRA_META, register_all  # noqa: E402
 
-
-@app.post("/api/pattern/link")
-@AUTH.require("analyst")
-def pattern_link():
-    b = request.get_json(force=True, silent=True) or {}
-    import modules.pattern.pattern as PAT
-    return jsonify(PAT.add_link(
-        b.get("src_type"), b.get("src_value"), b.get("dst_type"), b.get("dst_value"),
-        b.get("relation", "contacts"), b.get("source", "manual"),
-        b.get("confidence", 0.5), b.get("case_id"), _user()["username"]))
-
-
-@app.get("/api/pattern/links")
-@AUTH.require("viewer")
-def pattern_links():
-    import modules.pattern.pattern as PAT
-    return jsonify(PAT.list_links(request.args.get("entity"),
-                                  request.args.get("case_id", type=int),
-                                  request.args.get("limit", 200, type=int)))
-
-
-@app.post("/api/pattern/ingest")
-@AUTH.require("analyst")
-def pattern_ingest():
-    b = request.get_json(force=True, silent=True) or {}
-    # accept both {"events":[...], "case_id":N} and a bare JSON array
-    events = b if isinstance(b, list) else (b.get("events") or [])
-    cid = None if isinstance(b, list) else b.get("case_id")
-    import modules.pattern.pattern as PAT
-    return jsonify(PAT.ingest_events(events, cid, _user()["username"]))
-
-
-@app.post("/api/pattern/collect")
-@AUTH.require("analyst")
-def pattern_collect():
-    b = request.get_json(force=True, silent=True) or {}
-    import modules.pattern.connectors as PCON
-    return jsonify(PCON.run(b.get("entity", ""), b.get("platforms"),
-                            b.get("case_id"), _user()["username"]))
-
-
-@app.get("/api/pattern/frequent_contacts/<path:entity>")
-@AUTH.require("viewer")
-def pattern_contacts(entity):
-    import modules.pattern.pattern as PAT
-    return jsonify(PAT.frequent_contacts(
-        entity, request.args.get("case_id", type=int),
-        request.args.get("days", type=int),
-        request.args.get("top", 25, type=int)))
-
-
-@app.get("/api/pattern/pnl/<path:entity>")
-@AUTH.require("viewer")
-def pattern_pnl(entity):
-    import modules.pattern.pattern as PAT
-    return jsonify(PAT.pnl(entity, request.args.get("case_id", type=int),
-                           request.args.get("days", type=int)))
-
-
-@app.get("/api/pattern/diet/<path:entity>")
-@AUTH.require("viewer")
-def pattern_diet(entity):
-    import modules.pattern.pattern as PAT
-    return jsonify(PAT.url_diet(entity, request.args.get("case_id", type=int),
-                                request.args.get("top", 20, type=int)))
-
-
-@app.get("/api/pattern/ips/<path:entity>")
-@AUTH.require("viewer")
-def pattern_ips(entity):
-    import modules.pattern.pattern as PAT
-    return jsonify(PAT.ip_ledger(entity, request.args.get("case_id", type=int)))
-
-
-@app.post("/api/pattern/urls")
-@AUTH.require("analyst")
-def pattern_urls():
-    b = request.get_json(force=True, silent=True) or {}
-    import modules.pattern.pattern as PAT
-    return jsonify(PAT.record_urls(b.get("entity", ""), b.get("urls") or [],
-                                   b.get("case_id"), b.get("source", "manual"),
-                                   b.get("ts"), _user()["username"]))
-
-
-@app.post("/api/pattern/ips")
-@AUTH.require("analyst")
-def pattern_ips_post():
-    b = request.get_json(force=True, silent=True) or {}
-    import modules.pattern.pattern as PAT
-    return jsonify(PAT.add_ips(b.get("entity", ""), b.get("ips") or [],
-                               b.get("case_id"), b.get("source", "manual"),
-                               b.get("note", ""), _user()["username"]))
-
-
-@app.post("/api/pattern/header_ips")
-@AUTH.require("analyst")
-def pattern_header_ips():
-    b = request.get_json(force=True, silent=True) or {}
-    import modules.pattern.pattern as PAT
-    return jsonify(PAT.ingest_header_ips(b.get("headers", ""), b.get("entity"),
-                                         b.get("case_id"), _user()["username"]))
-
-
-@app.get("/api/pattern/org/<path:entity>")
-@AUTH.require("viewer")
-def pattern_org(entity):
-    import modules.pattern.pattern as PAT
-    return jsonify(PAT.org_view(entity, request.args.get("case_id", type=int)))
-
-
-@app.post("/api/pattern/email_graph")
-@AUTH.require("analyst")
-def pattern_email_graph():
-    b = request.get_json(force=True, silent=True) or {}
-    import modules.pattern.emailgraph as EGRAPH
-    return jsonify(EGRAPH.analyze(b.get("headers") or b.get("raw") or "",
-                                  b.get("case_id"), b.get("ingest", True),
-                                  _user()["username"]))
-
-
-# ---------------------------------------------------------------- 27. location pins (ROADMAP_PART3 W5)
-@app.post("/api/pins")
-@AUTH.require("analyst")
-def pins_create():
-    b = request.get_json(force=True, silent=True) or {}
-    import modules.geo.pins as PINS
-    return jsonify(PINS.create_pin(b.get("label"), b.get("lat"), b.get("lon"),
-                                   b.get("radius_m", 500), b.get("case_id"),
-                                   b.get("interval_min", 1440), _user()["username"]))
-
-
-@app.get("/api/pins")
-@AUTH.require("viewer")
-def pins_list():
-    import modules.geo.pins as PINS
-    return jsonify(PINS.list_pins(request.args.get("case_id", type=int)))
-
-
-@app.get("/api/pins/<int:pin_id>")
-@AUTH.require("viewer")
-def pins_bundle(pin_id):
-    import modules.geo.pins as PINS
-    pin = PINS.get_pin(pin_id)
-    if not pin:
-        return jsonify({"status": "error", "error": "pin not found"}), 404
-    return jsonify(PINS.bundle(pin))
-
-
-@app.post("/api/pins/<int:pin_id>/check")
-@AUTH.require("analyst")
-def pins_check(pin_id):
-    import modules.geo.pins as PINS
-    return jsonify(PINS.check(pin_id, _user()["username"]))
-
-
-@app.get("/api/pins/<int:pin_id>/passes")
-@AUTH.require("viewer")
-def pins_passes(pin_id):
-    import modules.geo.pins as PINS
-    return jsonify(PINS.passes(pin_id, None,
-                               request.args.get("days", 5, type=int),
-                               request.args.get("min_elev", 30, type=float),
-                               _user()["username"]))
-
-
-# ---------------------------------------------------------------- 28. offensive web intel (ROADMAP_PART3 W6)
-@app.post("/api/offsec/stack")
-@AUTH.require("analyst")
-def offsec_stack():
-    b = request.get_json(force=True, silent=True) or {}
-    import modules.webintel.webintel as WI
-    return jsonify(WI.stack_fingerprint(b.get("url", ""), b.get("case_id"),
-                                        _user()["username"]))
-
-
-@app.post("/api/offsec/payments")
-@AUTH.require("analyst")
-def offsec_payments():
-    b = request.get_json(force=True, silent=True) or {}
-    import modules.webintel.webintel as WI
-    return jsonify(WI.payment_addresses(b.get("url", ""), b.get("case_id"),
-                                        b.get("follow_internal", 8), _user()["username"]))
-
-
-@app.post("/api/offsec/canary")
-@AUTH.require("analyst")
-def offsec_canary():
-    b = request.get_json(force=True, silent=True) or {}
-    import modules.webintel.webintel as WI
-    return jsonify(WI.canary_scan(b.get("payload", ""), b.get("source", "evidence"),
-                                  b.get("case_id"), _user()["username"]))
-
-
-@app.post("/api/offsec/shortener")
-@AUTH.require("analyst")
-def offsec_shortener():
-    b = request.get_json(force=True, silent=True) or {}
-    import modules.webintel.webintel as WI
-    return jsonify(WI.shortener_intel(b.get("url", ""), b.get("max_hops", 10),
-                                      b.get("case_id"), _user()["username"]))
-
-
-@app.get("/api/broker/catalog")
-@AUTH.require("viewer")
-def broker_catalog():
-    import modules.broker.broker as BRK
-    return jsonify({"brokers": BRK.catalog()})
-
-
-@app.post("/api/broker/sweep")
-@AUTH.require("analyst")
-def broker_sweep():
-    b = request.get_json(force=True, silent=True) or {}
-    import modules.broker.broker as BRK
-    return jsonify(BRK.sweep(b.get("name", ""), b.get("brokers"),
-                             b.get("mode", "name"), b.get("address", ""),
-                             b.get("delay", 0.7), _user()["username"]))
+try:
+    register_all(app, CAPS, _user)
+    log.info("extra module routes registered: %d modules", len(EXTRA_META))
+except Exception as e:
+    log.error("extra module route registration failed: %s", e)
 
 
 # ---------------------------------------------------------------- background collector
@@ -2190,5 +2175,20 @@ if __name__ == "__main__":
         log.info("fan-out hook registered: archive_change")
     except Exception as e:
         log.warning("fan-out hooks unavailable: %s", e)
+    # Part 1 + Part 2 background daemons (each never blocks boot)
+    _EXTRA_DAEMONS = (
+        ("certstream", 1800), ("hostwatch", 900), ("darknet", 3600),
+        ("exposure", 21600), ("feedstream", 600), ("supplychain", 10800),
+        ("community", 1800), ("marketplace", 43200), ("phishkit", 7200),
+        ("foia", 43200), ("dsar", 21600),
+    )
+    import importlib as _il
+    for _n, _iv in _EXTRA_DAEMONS:
+        try:
+            _m = _il.import_module(f"modules.{_n}.{_n}")
+            _m.start_daemon(interval_sec=_iv)
+            log.info("%s daemon started", _n)
+        except Exception as e:
+            log.warning("%s daemon unavailable: %s", _n, e)
     log.info("Xaxglog on http://%s:%d modules=%s", C.HOST, C.PORT, CAPS)
     app.run(host=C.HOST, port=C.PORT, debug=os.getenv("FLASK_DEBUG", "0") == "1")

@@ -1,4 +1,7 @@
 import json
+import logging
+
+log = logging.getLogger("xaxglog")
 import re
 from database import get_connection
 from datetime import datetime
@@ -166,7 +169,7 @@ def process_indicators():
     rows = cursor.fetchall()
 
     if not rows:
-        print("No unprocessed indicators found.")
+        log.info("No unprocessed indicators found.")
         conn.close()
         return
 
@@ -183,7 +186,7 @@ def process_indicators():
 
     conn.commit()
     conn.close()
-    print(f"Processed {updated} indicators.")
+    log.info(f"Processed {updated} indicators.")
 
 
 def rescore_all():
@@ -201,7 +204,7 @@ def rescore_all():
         FROM threat_indicators
     """)
     rows = cursor.fetchall()
-    print(f"Rescoring {len(rows)} indicators...")
+    log.info(f"Rescoring {len(rows)} indicators...")
     for row in rows:
         entry = dict(row)
         score = calculate_score(entry, conn)
@@ -211,7 +214,7 @@ def rescore_all():
         )
     conn.commit()
     conn.close()
-    print("Rescore complete.")
+    log.info("Rescore complete.")
 
 
 if __name__ == "__main__":

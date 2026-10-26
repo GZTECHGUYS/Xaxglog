@@ -42,6 +42,13 @@ SEARX_INSTANCES = [
     "https://searxng.site",
 ]
 
+DEFAULT_ENGINES = ["ddg", "searx", "mojeek", "wikipedia"]
+EXTENDED_ENGINES = [
+    "marginalia", "stract", "mwmbl", "wiby", "metager", "qwant", "yep",
+    "ecosia", "startpage", "yandex", "baidu", "sogou", "so360", "naver",
+    "daum", "yahoo_jp", "goo_jp", "seznam", "uol", "rambler", "mailru",
+]
+
 _BLOCK_MARKERS = (
     "captcha", "anomaly", "verifying your browser", "are you a robot",
     "unusual traffic", "just a moment", "cf-chl", "challenge-platform",
@@ -72,6 +79,8 @@ def _post(url, **kw):
 
 def _clean(s):
     """Strip markup + collapse whitespace from a scraped snippet/title."""
+    if not isinstance(s, str):
+        s = " ".join(str(x) for x in s) if isinstance(s, (list, tuple)) else str(s or "")
     s = re.sub(r"<[^>]+>", " ", s or "")
     s = _html.unescape(s)
     return re.sub(r"\s+", " ", s).strip()
@@ -303,7 +312,269 @@ def wikipedia(query):
         return _engine_err("wikipedia", e)
 
 
-ENGINE_FNS = {"ddg": ddg, "searx": searx, "mojeek": mojeek, "wikipedia": wikipedia}
+
+# ------------------------------------------------------------------ extra HTML engines
+_SKIP_HOSTS = {
+    "duckduckgo.com", "www.duckduckgo.com", "mojeek.com", "www.mojeek.com",
+    "wikipedia.org", "www.wikipedia.org", "marginalia.nu", "search.marginalia.nu",
+    "stract.com", "www.stract.com", "wiby.me", "www.wiby.me", "metager.org",
+    "www.metager.org", "qwant.com", "www.qwant.com", "yep.com", "www.yep.com",
+    "ecosia.org", "www.ecosia.org", "startpage.com", "www.startpage.com",
+    "yandex.com", "yandex.ru", "baidu.com", "www.baidu.com", "sogou.com",
+    "www.sogou.com", "so.com", "www.so.com", "naver.com", "search.naver.com",
+    "daum.net", "search.daum.net", "yahoo.co.jp", "search.yahoo.co.jp",
+    "goo.ne.jp", "search.goo.ne.jp", "seznam.cz", "search.seznam.cz",
+    "uol.com.br", "busca.uol.com.br", "rambler.ru", "nova.rambler.ru",
+    "mail.ru", "go.mail.ru",
+}
+_SKIP_WORDS = (
+    "login", "sign in", "sign up", "privacy", "cookie", "about", "help",
+    "settings", "preferences", "donate", "advertise", "terms", "careers",
+    "download", "feedback", "search", "images", "videos", "news", "maps",
+)
+
+
+def _generic_html(query, url, engine, *, params=None, headers=None):
+    """Best-effort parser for public result pages with a simple anchor layout."""
+    out = {"engine": engine, "status": "ok", "results": []}
+    try:
+        query = (query or "").strip()
+        if not query:
+            out.update({"status": "error", "error": "empty query"})
+            return out
+        r = _get(url, params=params or {"q": query}, headers=headers or {
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "en-US,en;q=0.9",
+        })
+        st = _classify(r)
+        if st != "ok":
+            out["status"] = st
+            out["mode"] = "anti_bot" if st == "blocked" else "http_error"
+            return out
+        page = r.text or ""
+        rows, seen = [], set()
+        for attrs, inner in _anchors(page):
+            href = _attr(attrs, "href")
+            if not href:
+                continue
+            if href.startswith("//"):
+                href = "https:" + href
+            if not href.startswith("http"):
+                continue
+            try:
+                host = (urllib.parse.urlsplit(href).hostname or "").lower()
+            except Exception:
+                continue
+            if not host or host in _SKIP_HOSTS:
+                continue
+            title = _clean(inner)
+            if len(title) < 4 or len(title) > 220:
+                continue
+            low = title.lower()
+            if any(w in low for w in _SKIP_WORDS) and len(title) < 30:
+                continue
+            key = _norm_url(href)
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append({"title": title, "url": href, "snippet": ""})
+            if len(rows) >= CAP:
+                break
+        out["results"] = rows
+        if not rows:
+            head = page[:6000].lower()
+            if any(m in head for m in _BLOCK_MARKERS):
+                out["status"] = "blocked"
+                out["mode"] = "anti_bot"
+            else:
+                out["status"] = "empty"
+        return out
+    except Exception as e:
+        return _engine_err(engine, e)
+
+
+def marginalia(query):
+    return _generic_html(query, "https://search.marginalia.nu/search", "marginalia",
+                         params={"query": query})
+
+
+def stract(query):
+    return _generic_html(query, "https://stract.com/search", "stract",
+                         params={"q": query})
+
+
+def mwmbl(query):
+    out = {"engine": "mwmbl", "status": "ok", "results": []}
+    try:
+        r = _get("https://api.mwmbl.org/search", params={"s": query})
+        st = _classify(r)
+        if st != "ok":
+            out["status"] = st
+            return out
+        data = r.json() or {}
+        if isinstance(data, list):
+            rows = data
+        else:
+            rows = data.get("results") or data.get("hits") or []
+        out["results"] = [{"title": _clean(x.get("title") or x.get("name") or ""),
+                           "url": x.get("url") or x.get("href") or "",
+                           "snippet": _clean(x.get("snippet") or x.get("description") or "")}
+                          for x in rows[:CAP] if isinstance(x, dict) and (x.get("url") or x.get("href"))]
+        if not out["results"]:
+            out["status"] = "empty"
+        return out
+    except Exception as e:
+        return _engine_err("mwmbl", e)
+
+
+def wiby(query):
+    return _generic_html(query, "https://wiby.me/", "wiby", params={"q": query})
+
+
+def metager(query):
+    return _generic_html(query, "https://metager.org/meta/meta.ger3", "metager",
+                         params={"eingabe": query})
+
+
+def qwant(query):
+    out = {"engine": "qwant", "status": "ok", "results": []}
+    try:
+        r = _get("https://api.qwant.com/v3/search/web", params={
+            "q": query, "count": CAP, "locale": "en_US", "offset": 0,
+            "device": "desktop"}, headers={"Accept": "application/json"})
+        st = _classify(r)
+        if st != "ok":
+            out["status"] = st
+            return out
+        data = r.json() or {}
+        items = (((data.get("data") or {}).get("result") or {}).get("items")) or []
+        out["results"] = [{"title": _clean(x.get("title") or ""),
+                           "url": x.get("url") or "",
+                           "snippet": _clean(x.get("desc") or x.get("snippet") or "")}
+                          for x in items[:CAP] if isinstance(x, dict) and x.get("url")]
+        if not out["results"]:
+            out["status"] = "empty"
+        return out
+    except Exception as e:
+        return _engine_err("qwant", e)
+
+
+def yep(query):
+    out = {"engine": "yep", "status": "ok", "results": []}
+    try:
+        r = _get("https://api.yep.com/fs/2/search", params={
+            "client": "web", "gl": "US", "limit": CAP, "no_correct": "false",
+            "q": query, "safeSearch": "off", "type": "web"},
+            headers={"Accept": "application/json"})
+        st = _classify(r)
+        if st != "ok":
+            out["status"] = st
+            return out
+        data = r.json() or {}
+        rows = data.get("results") or data.get("web") or []
+        if isinstance(rows, dict):
+            rows = rows.get("results") or []
+        out["results"] = [{"title": _clean(x.get("title") or ""),
+                           "url": x.get("url") or x.get("link") or "",
+                           "snippet": _clean(x.get("snippet") or x.get("description") or "")}
+                          for x in rows[:CAP] if isinstance(x, dict) and (x.get("url") or x.get("link"))]
+        if not out["results"]:
+            out["status"] = "empty"
+        return out
+    except Exception as e:
+        return _engine_err("yep", e)
+
+
+def ecosia(query):
+    return _generic_html(query, "https://www.ecosia.org/search", "ecosia",
+                         params={"q": query})
+
+
+def startpage(query):
+    return _generic_html(query, "https://www.startpage.com/sp/search", "startpage",
+                         params={"query": query})
+
+
+def yandex(query):
+    return _generic_html(query, "https://yandex.com/search/", "yandex",
+                         params={"text": query})
+
+
+def baidu(query):
+    return _generic_html(query, "https://www.baidu.com/s", "baidu",
+                         params={"wd": query},
+                         headers={"Accept-Language": "zh-CN,zh;q=0.9"})
+
+
+def sogou(query):
+    return _generic_html(query, "https://www.sogou.com/web", "sogou",
+                         params={"query": query},
+                         headers={"Accept-Language": "zh-CN,zh;q=0.9"})
+
+
+def so360(query):
+    return _generic_html(query, "https://www.so.com/s", "so360",
+                         params={"q": query},
+                         headers={"Accept-Language": "zh-CN,zh;q=0.9"})
+
+
+def naver(query):
+    return _generic_html(query, "https://search.naver.com/search.naver", "naver",
+                         params={"query": query},
+                         headers={"Accept-Language": "ko-KR,ko;q=0.9"})
+
+
+def daum(query):
+    return _generic_html(query, "https://search.daum.net/search", "daum",
+                         params={"q": query},
+                         headers={"Accept-Language": "ko-KR,ko;q=0.9"})
+
+
+def yahoo_jp(query):
+    return _generic_html(query, "https://search.yahoo.co.jp/search", "yahoo_jp",
+                         params={"p": query},
+                         headers={"Accept-Language": "ja-JP,ja;q=0.9"})
+
+
+def goo_jp(query):
+    return _generic_html(query, "https://search.goo.ne.jp/web.jsp", "goo_jp",
+                         params={"MT": query},
+                         headers={"Accept-Language": "ja-JP,ja;q=0.9"})
+
+
+def seznam(query):
+    return _generic_html(query, "https://search.seznam.cz/", "seznam",
+                         params={"q": query},
+                         headers={"Accept-Language": "cs-CZ,cs;q=0.9"})
+
+
+def uol(query):
+    return _generic_html(query, "https://busca.uol.com.br/result", "uol",
+                         params={"q": query},
+                         headers={"Accept-Language": "pt-BR,pt;q=0.9"})
+
+
+def rambler(query):
+    return _generic_html(query, "https://nova.rambler.ru/search", "rambler",
+                         params={"query": query},
+                         headers={"Accept-Language": "ru-RU,ru;q=0.9"})
+
+
+def mailru(query):
+    return _generic_html(query, "https://go.mail.ru/search", "mailru",
+                         params={"q": query},
+                         headers={"Accept-Language": "ru-RU,ru;q=0.9"})
+
+
+ENGINE_FNS = {
+    "ddg": ddg, "searx": searx, "mojeek": mojeek, "wikipedia": wikipedia,
+    "marginalia": marginalia, "stract": stract, "mwmbl": mwmbl, "wiby": wiby,
+    "metager": metager, "qwant": qwant, "yep": yep, "ecosia": ecosia,
+    "startpage": startpage, "yandex": yandex, "baidu": baidu, "sogou": sogou,
+    "so360": so360, "naver": naver, "daum": daum, "yahoo_jp": yahoo_jp,
+    "goo_jp": goo_jp, "seznam": seznam, "uol": uol, "rambler": rambler,
+    "mailru": mailru,
+}
 
 
 # ------------------------------------------------------------------ federated
@@ -315,7 +586,7 @@ def federated(query, engines=None):
     """
     out = {"query": query, "engines": {}, "total": 0, "results": []}
     try:
-        names = list(engines) if engines else list(ENGINE_FNS.keys())
+        names = list(engines) if engines else list(DEFAULT_ENGINES)
         names = [n for n in names if n in ENGINE_FNS]
         if not query or not str(query).strip():
             out["error"] = "empty query"

@@ -559,3 +559,391 @@ export function CasesPanel({ api }) {
     </div>
   );
 }
+
+// ---------------------------------------------------------------- Country Scope
+export function CountryPanel({ api }) {
+  const [query, setQuery] = useState('');
+  const [country, setCountry] = useState('auto');
+  const [caseId, setCaseId] = useState('');
+  const [countries, setCountries] = useState([]);
+  const [res, setRes] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.get('/countryscope/countries')
+      .then(r => setCountries(r.data.countries || []))
+      .catch(() => {});
+  }, [api]);
+
+  const run = async () => {
+    if (!query.trim()) return;
+    setBusy(true); setErr(''); setRes(null);
+    try {
+      const r = await api.post('/countryscope/search', {
+        query,
+        country,
+        case_id: caseId ? +caseId : undefined,
+      });
+      setRes(r.data);
+    } catch (e) {
+      setErr(e.response?.data?.error || e.message);
+      setRes(e.response?.data || null);
+    }
+    setBusy(false);
+  };
+
+  const scope = res?.scope || {};
+  const live = scope.live || {};
+  const matchColour = { high:'#27ae60', medium:'#e67e22', low:'#f1c40f', unknown:'#8b949e' }[scope.match] || '#8b949e';
+
+  return (
+    <div style={S.section}>
+      <h2 style={S.title}>Country Scope</h2>
+      <p style={S.sub}>
+        Enter a name, company, domain, IP, phone or email and choose a country.
+        The module builds a country-specific source plan and runs free live checks
+        where available. Country matches are leads, not identity proof.
+      </p>
+      <div style={S.row}>
+        <input style={{...S.input, flex:2, minWidth:240}} value={query}
+          placeholder="Jane Doe / Acme Ltd / example.de / 8.8.8.8 / +49 30 123456"
+          onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==='Enter'&&run()} />
+        <select style={S.select} value={country} onChange={e=>setCountry(e.target.value)}>
+          <option value="auto">Auto-detect / choose country</option>
+          {countries.map(c => <option key={c.iso2} value={c.iso2}>{c.name} ({c.iso2})</option>)}
+        </select>
+        <input style={{...S.input, width:110}} placeholder="case id" value={caseId}
+          onChange={e=>setCaseId(e.target.value)} />
+        <button style={{...S.btn, background:'#e67e22'}} onClick={run} disabled={busy}>
+          {busy ? 'Scoping…' : 'Scope target'}
+        </button>
+      </div>
+      <Err e={err} />
+      {res && (
+        <div style={{marginTop:14}}>
+          <div style={{...S.row, marginBottom:10}}>
+            <span style={{...S.pill, background:matchColour}}>match: {scope.match || 'unknown'}</span>
+            <span style={S.tag}>{res.kind}</span>
+            <span style={S.tag}>{res.country?.name} ({res.country?.iso2})</span>
+            {res.country_inferred && <span style={S.tag}>country auto-detected</span>}
+            <span style={{color:'#8b949e', fontSize:12}}>
+              {(scope.signals || []).length} signals · {(res.sources || []).length} source links
+            </span>
+          </div>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:12}}>
+            <div>
+              <div style={S.label}>Scope signals</div>
+              {(scope.signals || []).map((sg, i) => (
+                <div key={i} style={S.card}>
+                  <div style={{...S.row, marginBottom:4}}>
+                    <span style={S.tag}>{sg.type}</span>
+                    <span style={{...S.tag, color:matchColour}}>{sg.confidence}</span>
+                  </div>
+                  <div style={{color:'#e6edf3', fontSize:13}}>{sg.value}</div>
+                  <div style={{color:'#8b949e', fontSize:11, marginTop:4}}>{sg.source}{sg.note ? ' · ' + sg.note : ''}</div>
+                  {sg.url && <a href={sg.url} target="_blank" rel="noopener noreferrer" style={{...S.mono, color:'#58a6ff'}}>{sg.url}</a>}
+                </div>
+              ))}
+              {Object.entries(live).map(([k, v]) => (
+                <div key={k} style={S.card}>
+                  <span style={S.tag}>live · {k}</span>
+                  <span style={{color:'#8b949e', fontSize:12, marginLeft:6}}>
+                    {v?.status || (v?.count != null ? 'ok' : 'unknown')}
+                    {v?.count != null ? ` · ${v.count} results` : ''}
+                  </span>
+                  {v?.error && <div style={{color:'#e74c3c', fontSize:11, marginTop:4}}>{v.error}</div>}
+                </div>
+              ))}
+              {!(scope.signals || []).length && !Object.keys(live).length && (
+                <div style={S.card}>No live country signal. Use the source links for manual checks.</div>
+              )}
+            </div>
+            <div>
+              <div style={S.label}>Country sources</div>
+              {(res.sources || []).map((src, i) => (
+                <div key={i} style={S.card}>
+                  <div style={{...S.row, marginBottom:4}}>
+                    <span style={S.tag}>{src.label}</span>
+                    <span style={{color:'#8b949e', fontSize:11}}>{src.name}</span>
+                  </div>
+                  <a href={src.url} target="_blank" rel="noopener noreferrer" style={{...S.mono, color:'#58a6ff'}}>{src.url}</a>
+                  {!src.query_scoped && <div style={{color:'#8b949e', fontSize:11, marginTop:4}}>portal link — run the query inside the source</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+          {res.caveat && <p style={{...S.sub, marginTop:12}}>{res.caveat}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Social Media
+export function SocialMediaPanel({ api }) {
+  const [query, setQuery] = useState('');
+  const [region, setRegion] = useState('all');
+  const [category, setCategory] = useState('all');
+  const [platforms, setPlatforms] = useState('');
+  const [caseId, setCaseId] = useState('');
+  const [scrape, setScrape] = useState(false);
+  const [probe, setProbe] = useState(false);
+  const [catalog, setCatalog] = useState(null);
+  const [res, setRes] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.get('/socialscrape/catalog').then(r => setCatalog(r.data)).catch(() => {});
+  }, [api]);
+
+  const run = async () => {
+    if (!query.trim()) return;
+    setBusy(true); setErr(''); setRes(null);
+    try {
+      const r = await api.post('/socialscrape/search', {
+        query,
+        region,
+        category,
+        platforms: platforms.trim() || undefined,
+        scrape,
+        probe,
+        case_id: caseId ? +caseId : undefined,
+        limit: 30,
+      }, { timeout: 240000 });
+      setRes(r.data);
+    } catch (e) {
+      setErr(e.response?.data?.error || e.message);
+      setRes(e.response?.data || null);
+    }
+    setBusy(false);
+  };
+
+  const summary = res?.summary || {};
+  const results = res?.results || [];
+  const links = res?.search_links || [];
+
+  return (
+    <div style={S.section}>
+      <h2 style={S.title}>Social Media Search</h2>
+      <p style={S.sub}>
+        Broad international public-source search across {catalog?.platforms || '168'} platforms.
+        Runs federated search, regional engines and keyless public APIs, then builds
+        platform-native search links. Login walls, private groups and captchas are
+        reported as blocked — never bypassed. Matches are leads, not identity proof.
+      </p>
+      <div style={S.row}>
+        <input style={{...S.input, flex:2, minWidth:240}} value={query}
+          placeholder="Jane Doe / jane_doe / #osint / https://x.com/jane/status/123"
+          onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==='Enter'&&run()} />
+        <select style={S.select} value={region} onChange={e=>setRegion(e.target.value)}>
+          <option value="all">all regions</option>
+          {(catalog?.regions || []).map(r => <option key={r} value={r}>{r}</option>)}
+        </select>
+        <select style={S.select} value={category} onChange={e=>setCategory(e.target.value)}>
+          <option value="all">all categories</option>
+          {(catalog?.categories || []).map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <input style={{...S.input, width:180}} value={platforms}
+          placeholder="platforms (optional)" onChange={e=>setPlatforms(e.target.value)} />
+        <input style={{...S.input, width:90}} value={caseId}
+          placeholder="case id" onChange={e=>setCaseId(e.target.value)} />
+        <button style={{...S.btn, background:'#8957e5'}} onClick={run} disabled={busy}>
+          {busy ? 'Searching…' : 'Search social'}
+        </button>
+      </div>
+      <div style={{...S.row, marginTop:8}}>
+        <label style={{color:'#8b949e', fontSize:12}}>
+          <input type="checkbox" checked={scrape} onChange={e=>setScrape(e.target.checked)} /> scrape top public pages
+        </label>
+        <label style={{color:'#8b949e', fontSize:12}}>
+          <input type="checkbox" checked={probe} onChange={e=>setProbe(e.target.checked)} /> probe exact handle profiles
+        </label>
+        {catalog && <span style={{color:'#8b949e', fontSize:12}}>
+          {catalog.platforms} platforms · {catalog.searchable_platforms} searchable
+        </span>}
+      </div>
+      <Err e={err} />
+      {res && (
+        <div style={{marginTop:14}}>
+          <div style={{...S.row, marginBottom:10}}>
+            <span style={{...S.pill, background: res.status === 'ok' ? '#27ae60' : res.status === 'blocked' ? '#e67e22' : '#8b949e'}}>
+              {res.status}
+            </span>
+            <span style={S.tag}>{summary.results ?? results.length} results</span>
+            <span style={S.tag}>{links.length} search links</span>
+            <span style={S.tag}>{res.platforms_selected ?? 0} platforms</span>
+            <span style={S.tag}>{summary.profiles ?? 0} profile hits</span>
+          </div>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))', gap:12}}>
+            <div>
+              <div style={S.label}>Public results</div>
+              {results.map((r, i) => (
+                <div key={i} style={S.card}>
+                  <div style={{...S.row, marginBottom:4}}>
+                    <span style={S.tag}>{r.platform || r.source || 'result'}</span>
+                    {r.post_type && <span style={S.tag}>{r.post_type}</span>}
+                    {r.source && <span style={{color:'#8b949e', fontSize:11}}>{r.source}</span>}
+                  </div>
+                  <div style={{color:'#e6edf3', fontSize:13}}>{r.title || r.url}</div>
+                  {r.snippet && <div style={{color:'#8b949e', fontSize:12, marginTop:4}}>{r.snippet}</div>}
+                  {(r.author || r.published) && <div style={{color:'#8b949e', fontSize:11, marginTop:4}}>
+                    {[r.author, r.published].filter(Boolean).join(' · ')}
+                  </div>}
+                  {r.url && <a href={r.url} target="_blank" rel="noopener noreferrer" style={{...S.mono, color:'#58a6ff'}}>{r.url}</a>}
+                </div>
+              ))}
+              {!results.length && <div style={S.card}>{res.note || 'No public results. Use the platform search links.'}</div>}
+            </div>
+            <div>
+              <div style={S.label}>Platform search links</div>
+              {links.slice(0, 120).map((l, i) => (
+                <div key={i} style={S.card}>
+                  <div style={{...S.row, marginBottom:4}}>
+                    <span style={S.tag}>{l.platform}</span>
+                    <span style={{color:'#8b949e', fontSize:11}}>{l.region}</span>
+                  </div>
+                  <a href={l.url} target="_blank" rel="noopener noreferrer" style={{...S.mono, color:'#58a6ff'}}>{l.url}</a>
+                </div>
+              ))}
+              {!links.length && <div style={S.card}>No platform search links.</div>}
+            </div>
+          </div>
+          <details style={{...S.card, marginTop:12}}>
+            <summary style={{cursor:'pointer', color:'#58a6ff'}}>raw response</summary>
+            <pre style={{...S.mono, whiteSpace:'pre-wrap'}}>{JSON.stringify(res, null, 2)}</pre>
+          </details>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Image Reverse
+export function ImageReversePanel({ api }) {
+  const [url, setUrl] = useState('');
+  const [path, setPath] = useState('');
+  const [caseId, setCaseId] = useState('');
+  const [apiOn, setApiOn] = useState(true);
+  const [catalog, setCatalog] = useState(null);
+  const [res, setRes] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.get('/imgreverse/catalog').then(r => setCatalog(r.data)).catch(() => {});
+  }, [api]);
+
+  const run = async () => {
+    if (!url.trim() && !path.trim()) return;
+    setBusy(true); setErr(''); setRes(null);
+    try {
+      const r = await api.post('/imgreverse/search', {
+        image_url: url.trim() || undefined,
+        image_path: path.trim() || undefined,
+        include_api: apiOn,
+        case_id: caseId ? +caseId : undefined,
+      }, { timeout: 180000 });
+      setRes(r.data);
+    } catch (e) {
+      setErr(e.response?.data?.error || e.message);
+      setRes(e.response?.data || null);
+    }
+    setBusy(false);
+  };
+
+  const labels = {};
+  (catalog?.engines_list || []).forEach(e => { labels[e.id] = e.label || e.id; });
+  const summary = res?.summary || {};
+  const links = res?.links || {};
+  const hits = res?.hits || [];
+  const engineStatus = res?.engines || {};
+
+  return (
+    <div style={S.section}>
+      <h2 style={S.title}>Image Reverse Lookup</h2>
+      <p style={S.sub}>
+        Build reverse-image links for Google Lens, Bing, Yandex, TinEye, SauceNAO,
+        IQDB, ascii2d, Baidu, Sogou, Karma Decay and Trace.moe. Runs keyless Trace.moe
+        and optional-key APIs. Face-search/biometric engines are excluded. Hits are
+        provenance leads, not identity proof.
+      </p>
+      <div style={S.row}>
+        <input style={{...S.input, flex:2, minWidth:260}} value={url}
+          placeholder="https://example.com/photo.jpg"
+          onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==='Enter'&&run()} />
+        <input style={{...S.input, flex:1, minWidth:200}} value={path}
+          placeholder="server-local path (optional)" onChange={e=>setPath(e.target.value)} />
+        <input style={{...S.input, width:90}} value={caseId}
+          placeholder="case id" onChange={e=>setCaseId(e.target.value)} />
+        <button style={{...S.btn, background:'#e67e22'}} onClick={run} disabled={busy}>
+          {busy ? 'Looking up…' : 'Lookup image'}
+        </button>
+      </div>
+      <div style={{...S.row, marginTop:8}}>
+        <label style={{color:'#8b949e', fontSize:12}}>
+          <input type="checkbox" checked={apiOn} onChange={e=>setApiOn(e.target.checked)} /> run API engines
+        </label>
+        {catalog && <span style={{color:'#8b949e', fontSize:12}}>
+          {catalog.engines} engines · {catalog.link_engines} link-out · {catalog.api_engines} API
+        </span>}
+      </div>
+      <Err e={err} />
+      {res && (
+        <div style={{marginTop:14}}>
+          <div style={{...S.row, marginBottom:10}}>
+            <span style={{...S.pill, background: res.status === 'ok' ? '#27ae60' : res.status === 'partial' ? '#e67e22' : '#8b949e'}}>
+              {res.status}
+            </span>
+            <span style={S.tag}>{summary.total_hits ?? hits.length} hits</span>
+            <span style={S.tag}>{Object.keys(links).length} links</span>
+            <span style={S.tag}>{summary.engines_checked ?? 0} API engines</span>
+          </div>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))', gap:12}}>
+            <div>
+              <div style={S.label}>Engine links</div>
+              {Object.entries(links).map(([id, link]) => (
+                <div key={id} style={S.card}>
+                  <div style={{...S.row, marginBottom:4}}>
+                    <span style={S.tag}>{labels[id] || id}</span>
+                    <span style={{color:'#8b949e', fontSize:11}}>link</span>
+                  </div>
+                  <a href={link} target="_blank" rel="noopener noreferrer" style={{...S.mono, color:'#58a6ff'}}>{link}</a>
+                </div>
+              ))}
+              {!Object.keys(links).length && <div style={S.card}>No links generated.</div>}
+            </div>
+            <div>
+              <div style={S.label}>API hits / status</div>
+              {hits.map((h, i) => (
+                <div key={i} style={S.card}>
+                  <div style={{...S.row, marginBottom:4}}>
+                    <span style={S.tag}>{h.source || 'hit'}</span>
+                    {h.similarity != null && <span style={{color:'#8b949e', fontSize:11}}>similarity {h.similarity}</span>}
+                  </div>
+                  <div style={{color:'#e6edf3', fontSize:13}}>{h.title || 'match'}</div>
+                  {h.url && <a href={h.url} target="_blank" rel="noopener noreferrer" style={{...S.mono, color:'#58a6ff'}}>{h.url}</a>}
+                </div>
+              ))}
+              {Object.entries(engineStatus).map(([id, v]) => (
+                <div key={id} style={S.card}>
+                  <div style={{...S.row, marginBottom:4}}>
+                    <span style={S.tag}>{labels[id] || id}</span>
+                    <span style={{color:'#8b949e', fontSize:11}}>{v.status}</span>
+                  </div>
+                  {(v.note || v.error) && <div style={{color:'#8b949e', fontSize:11}}>{v.note || v.error}</div>}
+                </div>
+              ))}
+              {!hits.length && !Object.keys(engineStatus).length && <div style={S.card}>No API hits. Use the engine links.</div>}
+            </div>
+          </div>
+          <details style={{...S.card, marginTop:12}}>
+            <summary style={{cursor:'pointer', color:'#58a6ff'}}>raw response</summary>
+            <pre style={{...S.mono, whiteSpace:'pre-wrap'}}>{JSON.stringify(res, null, 2)}</pre>
+          </details>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -5,11 +5,10 @@ import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 import './App.css';
-import { ReconPanel, AttributionPanel, DarkWebPanel, SimSwapPanel, SS7Panel, CasesPanel } from './OperatorPanels';
+import { ReconPanel, AttributionPanel, DarkWebPanel, SimSwapPanel, SS7Panel, CasesPanel, CountryPanel, SocialMediaPanel, ImageReversePanel } from './OperatorPanels';
 import { GeoPanel, VehiclePanel, CctvPanel, IotPanel, CorporatePanel, CryptoPanel, ScreenPanel, InfraPanel } from './IntelPanels';
+import { IdentityPanel, SourceRegistryPanel } from './IdentityPanels';
 import { PlaybookPanel, GlobalCorpPanel, WorldRiskPanel, GeoExtraPanel, AiBriefPanel, TrackersPanel } from './DeepPanels';
-import { PatternPanel } from './PatternPanel';
-import { BonusPanel } from './BonusPanel';
 
 const API = process.env.REACT_APP_API
   ? `${process.env.REACT_APP_API.replace(/\/$/, '')}/api`
@@ -395,15 +394,14 @@ export default function App() {
       <div style={{display:'flex', gap:6, flexWrap:'wrap', padding:'0 20px 16px',
         borderBottom:'1px solid #30363d', marginBottom:16}}>
         {[
-          ['threat','Threat Intel'],['cases','Cases & Graph'],['recon','Deep Recon'],
+          ['threat','Threat Intel'],['cases','Cases & Graph'],['identity','Identity'],['social','Social Media'],['imagerev','Image Reverse'],['country','Country Scope'],['recon','Deep Recon'],['sources','Source Registry'],
           ['attribution','Attribution'],['darkweb','Dark Web'],['simswap','SIM-Swap'],['ss7','SS7 Lookup'],
           ['geo','GEOINT Map'],['vehicle','Vehicles'],['cctv','CCTV'],['iot','IoT'],
           ['corporate','Corporate'],['crypto','Crypto'],['screening','Screening'],['infra','Infra Pivot'],
           ['playbooks','Playbooks'],['worldcorp','Global Corp'],['risk','World Risk'],
           ['geoextra','Geo Extra'],['aibrief','AI Brief'],['trackers','Trackers'],
-          ['pattern','Pattern Tracker'],['offsec','Offsec Intel'],
         ].map(([k,label]) => (
-          <button key={k} onClick={()=>setTab(k)} className={tab===k?'tabBtn active':'tabBtn'} style={{
+          <button key={k} onClick={()=>setTab(k)} style={{
             background: tab===k ? '#1f6feb' : '#21262d',
             color: tab===k ? '#fff' : '#8b949e',
             border:'none', borderRadius:6, padding:'8px 14px', fontSize:13, fontWeight:600, cursor:'pointer'
@@ -420,6 +418,11 @@ export default function App() {
 
         {/* OPERATOR PANELS (non-threat tabs) */}
         {tab==='cases'      && <CasesPanel api={api} />}
+        {tab==='identity'   && <IdentityPanel api={api} />}
+        {tab==='sources'    && <SourceRegistryPanel api={api} />}
+        {tab==='social'     && <SocialMediaPanel api={api} />}
+        {tab==='imagerev'   && <ImageReversePanel api={api} />}
+        {tab==='country'    && <CountryPanel api={api} />}
         {tab==='recon'      && <ReconPanel api={api} />}
         {tab==='attribution'&& <AttributionPanel api={api} />}
         {tab==='darkweb'    && <DarkWebPanel api={api} />}
@@ -439,8 +442,6 @@ export default function App() {
         {tab==='geoextra'   && <GeoExtraPanel api={api} />}
         {tab==='aibrief'    && <AiBriefPanel api={api} />}
         {tab==='trackers'   && <TrackersPanel api={api} />}
-        {tab==='pattern'    && <PatternPanel api={api} />}
-        {tab==='offsec'     && <BonusPanel api={api} />}
 
         {tab==='threat' && (<>
         {/*  ALERTS BANNER  */}

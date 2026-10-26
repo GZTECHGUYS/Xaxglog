@@ -46,11 +46,22 @@ from .social import (  # noqa: E402  (kept with the username section for discove
     SAFE_USER_RE,
     check_username,
     discover_social,
+    handle_candidates,
     name_registry_search,
+    normalize_people_platforms,
     scrape_profile,
     social_footprint,
     sources_catalog,
     verified_accounts,
+)
+from .location import (  # noqa: E402
+    _signal,
+    email_signals,
+    infrastructure_signals,
+    merge_signals,
+    name_signals,
+    phone_signals,
+    profile_signals,
 )
 
 
@@ -113,6 +124,8 @@ def email_search(email, hibp_key=""):
                 out["breaches"]["hibp"] = {"http": rr.status_code}
     else:
         out["breaches"]["hibp"] = {"skipped": "HIBP_API_KEY not set"}
+    out["location"] = email_signals(email, gravatar=out["meta"].get("gravatar"),
+                                    include_profiles=False)
     return out
 
 
@@ -150,6 +163,7 @@ def phone_search(number, apilayer_key=""):
                 out["apilayer"] = {"raw": r.text[:300]}
     else:
         out["apilayer"] = {"skipped": "NUM_API_KEY not set"}
+    out["location"] = phone_signals(number)
     return out
 
 
@@ -302,10 +316,39 @@ def person_search(name_or_user, profiles=None, include_social=True):
             "platforms": out["profiles"].get("platforms"),
             "hits": out["profiles"].get("hits", []),
             "by_category": out["profiles"].get("by_category", {}),
+            "coverage": out["profiles"].get("coverage"),
         }
 
     people = out.get("people") or {}
     social = out.get("social") or {}
+    # Display-name hits from platforms that expose name search. This is what
+    # catches "Jane Doe" when her handle is not literally "janedoe".
+    out["name_platforms"] = people.get("platforms") or {
+        "checked": 0, "hits": [], "by_platform": {}, "platforms": []}
+    if handle_like:
+        out["coverage"] = (out.get("profiles") or {}).get("coverage") or {
+            "mode": "handle", "total_platforms": len(PLATFORMS),
+            "checked": 0, "not_checked": len(PLATFORMS)}
+    else:
+        out["coverage"] = people.get("coverage") or {
+            "mode": "name", "total_platforms": len(PLATFORMS),
+            "name_searchable": 0, "not_name_searchable": []}
+    out["handle_candidates"] = handle_candidates(q)
+    out["handle_note"] = ("Suggested public-handle spellings; they are not probed "
+                          "unless an operator submits them as a handle query.")
+    location_signals = name_signals(people, out["name_platforms"])
+    if handle_like and isinstance(out.get("github"), dict) and out["github"].get("location"):
+        location_signals.append(_signal(
+            "profile_location", out["github"]["location"], "GitHub", "profile",
+            "medium", "self-declared GitHub location",
+            out["github"].get("html_url") or ""))
+    for prof in (out.get("verified") or {}).get("verified") or []:
+        if isinstance(prof, dict) and prof.get("location"):
+            location_signals.append(_signal(
+                "profile_location", prof["location"],
+                prof.get("platform") or "public profile", "profile", "medium",
+                "self-declared public profile location", prof.get("url") or ""))
+    out["location_signals"] = merge_signals(location_signals)
     if not handle_like:
         if people.get("total"):
             out["note"] = ("name matches across %d public indexes; verify identity "
@@ -337,6 +380,119 @@ def profile_lookup(url):
 def source_catalog():
     """List all configured people/social sources."""
     return sources_catalog()
+
+
+def _scrape_hit_locations(hits, limit=3):
+    signals = []
+    for hit in (hits or [])[:limit]:
+        url = hit.get("final_url") or hit.get("url") or ""
+        if not url:
+            continue
+        scraped = scrape_profile(url)
+        signals.extend(profile_signals(scraped))
+    return signals
+
+
+def location_search(query, include_profiles=True):
+    """Public location *signals* for a phone, email, name, handle or domain.
+
+    This is not live tracking. It returns self-declared profile locations,
+    coarse number-plan regions, and server/IP geolocation with explicit
+    precision labels. Precise or real-time location requires consent (TrackPin)
+    or a lawful carrier/emergency request.
+    """
+    q = (query or "").strip()
+    out = {"input": q, "status": "ok", "signals": [], "precision": "none",
+           "raw": {},
+           "disclaimer": ("Public/self-declared signals only. A phone number, "
+                          "email or profile does not provide GPS. Use consent "
+                          "or a lawful authority request for precise location.")}
+    if not q:
+        out.update({"status": "error", "error": "query required"})
+        return out
+    t = detect_type(q)
+    out["detected_type"] = t
+    if t == "phone":
+        r = phone_signals(q)
+        out["signals"] = r.get("signals") or []
+        out["raw"]["phone"] = r
+        out["disclaimer"] = r.get("disclaimer", out["disclaimer"])
+    elif t == "email":
+        r = email_signals(q, include_profiles=include_profiles)
+        out["signals"] = r.get("signals") or []
+        out["raw"]["email"] = r
+        out["disclaimer"] = r.get("disclaimer", out["disclaimer"])
+    elif t == "ip":
+        r = ip_search(q)
+        out["signals"] = infrastructure_signals(r)
+        out["raw"]["ip"] = r
+    elif t == "domain":
+        d = domain_search(q)
+        out["raw"]["domain"] = d
+        ip = None
+        try:
+            ip = socket.gethostbyname(q.split("/")[0])
+        except Exception:
+            pass
+        if ip:
+            r = ip_search(ip)
+            out["raw"]["ip"] = r
+            out["signals"] = infrastructure_signals(r)
+    elif t in ("person", "username"):
+        if t == "person":
+            people = name_registry_search(q)
+            platforms = people.get("platforms") or normalize_people_platforms(people)
+            out["raw"]["people"] = people
+            out["signals"].extend(name_signals(people, platforms))
+            if include_profiles:
+                out["signals"].extend(_scrape_hit_locations(platforms.get("hits"), 3))
+        else:
+            profiles = check_username(q)
+            out["raw"]["profiles"] = {
+                "checked": profiles.get("checked"),
+                "hits": profiles.get("hits", []),
+            }
+            if include_profiles:
+                out["signals"].extend(_scrape_hit_locations(profiles.get("hits"), 3))
+            gh = _github_profile(q)
+            if isinstance(gh, dict) and gh.get("location"):
+                out["signals"].append(_signal(
+                    "profile_location", gh["location"], "GitHub", "profile",
+                    "medium", "self-declared GitHub location", gh.get("html_url") or ""))
+            verified = verified_accounts(q)
+            out["raw"]["verified"] = verified.get("sources") or {}
+            for prof in verified.get("verified") or []:
+                if prof.get("location"):
+                    out["signals"].append(_signal(
+                        "profile_location", prof["location"],
+                        prof.get("platform") or "public profile", "profile",
+                        "medium", "self-declared public profile location",
+                        prof.get("url") or ""))
+    elif t == "company":
+        c = company_search(q)
+        out["raw"]["company"] = c
+        for row in (c.get("results") or [])[:5]:
+            if row.get("jurisdiction"):
+                out["signals"].append(_signal(
+                    "company_jurisdiction", row["jurisdiction"],
+                    "OpenCorporates", "organization", "medium",
+                    "company registration jurisdiction, not a person's location",
+                    row.get("url") or ""))
+    else:
+        out.update({"status": "empty", "note": "unsupported target type"})
+    out["signals"] = merge_signals(out["signals"])
+    order = ("exact", "profile", "coarse", "infrastructure", "organization",
+             "affiliation", "none")
+    precisions = {s.get("precision") for s in out["signals"]}
+    out["precision"] = next((p for p in order if p in precisions), "none")
+    out["counts"] = {}
+    for sig in out["signals"]:
+        key = sig.get("precision") or "none"
+        out["counts"][key] = out["counts"].get(key, 0) + 1
+    if not out["signals"]:
+        out["status"] = "empty"
+        out.setdefault("note", "no public location signal found")
+    return out
 
 
 def company_search(query):

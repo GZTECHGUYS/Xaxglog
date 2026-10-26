@@ -1,3 +1,7 @@
+import logging
+
+log = logging.getLogger("xaxglog")
+
 import sqlite3
 
 DB_PATH = "osint.db"
@@ -44,7 +48,7 @@ def init_db():
 
     conn.commit()
     conn.close()
-    print("Database initialised successfully.")
+    log.info("threat_intel database initialised")
 
 if __name__ == "__main__":
     init_db()

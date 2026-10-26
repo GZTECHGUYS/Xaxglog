@@ -112,6 +112,46 @@ CREATE TABLE IF NOT EXISTS audit_log (
   detail TEXT DEFAULT '',
   ip TEXT DEFAULT ''
 );
+
+-- TrackPin: lawful, consent-based or authority-gated location workflow.
+-- There is no covert call/SMS interception or silent device tracking here.
+CREATE TABLE IF NOT EXISTS trackpin_ops (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  case_id INTEGER,
+  label TEXT NOT NULL,
+  target TEXT NOT NULL,
+  mode TEXT NOT NULL DEFAULT 'consent_checkin', -- consent_checkin | authority_request | manual_ingest
+  status TEXT NOT NULL DEFAULT 'open',           -- open | requested | consented | closed | expired
+  legal_basis TEXT DEFAULT '',
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  consent_token TEXT UNIQUE,
+  consent_expires TEXT,
+  consent_used INTEGER NOT NULL DEFAULT 0,
+  authority_ref TEXT DEFAULT '',
+  notes TEXT DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS trackpin_points (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  op_id INTEGER NOT NULL,
+  case_id INTEGER,
+  lat REAL NOT NULL,
+  lon REAL NOT NULL,
+  accuracy_m REAL,
+  source TEXT NOT NULL,                          -- consent_link | manual | authority | open_source
+  consent INTEGER NOT NULL DEFAULT 0,
+  consent_ref TEXT DEFAULT '',
+  captured_at TEXT NOT NULL,
+  received_at TEXT NOT NULL,
+  ip TEXT DEFAULT '',
+  user_agent TEXT DEFAULT '',
+  note TEXT DEFAULT '',
+  meta TEXT DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_trackpin_points_op ON trackpin_points(op_id);
+CREATE INDEX IF NOT EXISTS idx_trackpin_ops_case ON trackpin_ops(case_id);
 """
 
 FTS_SCHEMA = """
@@ -124,7 +164,7 @@ _conn_local = threading.local()
 
 
 def utcnow():
-    return datetime.datetime.utcnow().isoformat() + "Z"
+    return datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def get_db():

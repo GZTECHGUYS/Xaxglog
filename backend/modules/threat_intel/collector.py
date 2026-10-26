@@ -1,3 +1,4 @@
+import logging
 import requests
 import json
 import sqlite3
@@ -8,6 +9,8 @@ from cryptography.fernet import Fernet
 import os
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+
+log = logging.getLogger("xaxglog")
 
 
 # Key resolution
@@ -54,7 +57,7 @@ def resolve_key(service, env_var):
 
 # URLhaus
 def fetch_urlhaus():
-    print("Fetching from URLhaus...")
+    log.info("Fetching from URLhaus...")
     headers  = {"Auth-Key": resolve_key("urlhaus", "URLHAUS_API_KEY")}
     response = requests.get(
         "https://urlhaus-api.abuse.ch/v1/urls/recent/limit/100/",
@@ -63,7 +66,7 @@ def fetch_urlhaus():
     data = response.json()
 
     if "urls" not in data or not data["urls"]:
-        print(f"URLhaus: no data. Response: {data}")
+        log.warning(f"URLhaus: no data. Response: {data}")
         return
 
     conn   = get_connection()
@@ -99,12 +102,12 @@ def fetch_urlhaus():
 
     conn.commit()
     conn.close()
-    print(f"URLhaus: {count} indicators saved.")
+    log.info(f"URLhaus: {count} indicators saved.")
 
 
 # AbuseIPDB
 def fetch_abuseipdb():
-    print("Fetching from AbuseIPDB...")
+    log.info("Fetching from AbuseIPDB...")
     headers = {
         "Key":    resolve_key("abuseipdb", "ABUSEIPDB_API_KEY"),
         "Accept": "application/json"
@@ -119,7 +122,7 @@ def fetch_abuseipdb():
     data = response.json()
 
     if "data" not in data:
-        print(f"AbuseIPDB: no data. Response: {data}")
+        log.warning(f"AbuseIPDB: no data. Response: {data}")
         return
 
     conn   = get_connection()
@@ -156,12 +159,12 @@ def fetch_abuseipdb():
 
     conn.commit()
     conn.close()
-    print(f"AbuseIPDB: {count} indicators saved.")
+    log.info(f"AbuseIPDB: {count} indicators saved.")
 
 
 # AlienVault OTX
 def fetch_otx():
-    print("Fetching from AlienVault OTX...")
+    log.info("Fetching from AlienVault OTX...")
     headers  = {"X-OTX-API-KEY": resolve_key("otx", "OTX_API_KEY")}
     # Pull the latest 20 pulses from the subscribed feed
     response = requests.get(
@@ -171,7 +174,7 @@ def fetch_otx():
     data = response.json()
 
     if "results" not in data:
-        print(f"OTX: no data. Response: {data}")
+        log.warning(f"OTX: no data. Response: {data}")
         return
 
     conn   = get_connection()
@@ -216,12 +219,12 @@ def fetch_otx():
 
     conn.commit()
     conn.close()
-    print(f"OTX: {count} indicators saved.")
+    log.info(f"OTX: {count} indicators saved.")
 
 
 # VirusTotal
 def fetch_virustotal():
-    print("Fetching from VirusTotal...")
+    log.info("Fetching from VirusTotal...")
     headers  = {"x-apikey": resolve_key("virustotal", "VIRUSTOTAL_API_KEY")}
     # Pull recently detected URLs - free tier allows this endpoint
     response = requests.get(
@@ -230,13 +233,13 @@ def fetch_virustotal():
     )
 
     if response.status_code != 200:
-        print(f"VirusTotal: error {response.status_code}. {response.text[:200]}")
+        log.warning(f"VirusTotal: error {response.status_code}. {response.text[:200]}")
         return
 
     data = response.json()
 
     if "data" not in data:
-        print(f"VirusTotal: no data.")
+        log.warning(f"VirusTotal: no data.")
         return
 
     conn   = get_connection()
@@ -277,7 +280,7 @@ def fetch_virustotal():
 
     conn.commit()
     conn.close()
-    print(f"VirusTotal: {count} indicators saved.")
+    log.info(f"VirusTotal: {count} indicators saved.")
 
 
 # Runs all collectors then process
@@ -286,4 +289,4 @@ if __name__ == "__main__":
     fetch_abuseipdb()
     fetch_otx()
     fetch_virustotal()
-    print("All sources collected.")
+    log.info("All sources collected.")
