@@ -135,6 +135,7 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
     <button data-view="broker">Broker</button>
     <button data-view="records">Records</button>
     <button data-view="sources">Sources</button>
+    <button data-view="modules">Modules</button>
   </nav>
 
   <div id="loginPanel" class="card hidden">
@@ -561,6 +562,36 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
     </div>
   </section>
 
+  <!-- ============================================================ MODULES -->
+  <section class="view" id="view-modules">
+    <div class="card">
+      <h2>Declarative module registry <span class="pill purple">generic probes</span></h2>
+      <p class="desc">One declaration per public source with a generic probe recipe: JSON API, public profile page (fragile), public search page (fragile), oEmbed, existing keyless adapter or analyst link-out. Only live-verified and fragile modules are automatic evidence. Adapter/candidate/optional-key/link-out/blocked sources stay catalog-only.</p>
+      <div class="stats" id="modulesSummary"></div>
+      <div class="row" style="margin-top:12px;align-items:flex-end">
+        <div style="flex:2;min-width:240px"><label class="badge">query for selected/verified modules</label><input id="moduleQuery" placeholder="Jane Doe / example.com / 8.8.8.8 / jane_doe"/></div>
+        <div><label class="badge">category</label><select id="moduleCategory"><option value="">all</option></select></div>
+        <div><label class="badge">status</label><select id="moduleStatus"><option value="">all</option></select></div>
+        <div><label class="badge">probe</label><select id="moduleProbe"><option value="">all</option></select></div>
+        <button class="orange" id="moduleSearchGo">Run verified search</button>
+        <button class="ghost small" id="moduleVerifyGo">Verify selected</button>
+        <button class="ghost small" id="moduleLinksGo">Build link-outs</button>
+        <span class="statusline" id="moduleStatusline"></span>
+      </div>
+      <div id="moduleCoverage" style="margin-top:12px"></div>
+      <div id="moduleResults" style="margin-top:12px"></div>
+    </div>
+    <div class="card">
+      <div class="row" style="align-items:flex-end">
+        <div style="flex:2;min-width:240px"><label class="badge">filter modules</label><input id="moduleFilter" placeholder="id / label / adapter"/></div>
+        <button class="ghost small" id="moduleReload">Reload</button>
+        <button class="ghost small" id="moduleSelectVisible">Select visible</button>
+        <span class="statusline" id="moduleSelectStatus"></span>
+      </div>
+      <div class="tablewrap" style="margin-top:12px"><table id="modulesTable"><thead><tr><th>Select</th><th>Module</th><th>Category</th><th>Access</th><th>Status</th><th>Probe</th><th>Region</th><th>Key</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
   <!-- ============================================================ SOURCES -->
   <section class="view" id="view-sources">
     <div class="card">
@@ -601,6 +632,9 @@ const state = {
   lastProfiles: [],
   profileFilter: "all",
   sourcesLoaded: false,
+  modulesLoaded: false,
+  moduleRegistry: null,
+  moduleSelected: [],
   socialCatalogLoaded: false,
   imgrevCatalogLoaded: false,
   imgrevLabels: {},
@@ -638,6 +672,7 @@ document.querySelectorAll(".nav button").forEach(b => b.onclick = () => {
   document.querySelectorAll(".nav button").forEach(x => x.classList.toggle("on", x === b));
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "view-" + state.view));
   if (state.view === "sources" && !state.sourcesLoaded) loadSources();
+  if (state.view === "modules" && !state.modulesLoaded) loadModules();
   if (state.view === "social") { loadSocialCatalog(); loadCases(); }
   if (state.view === "imagerev") { loadImgrevCatalog(); loadCases(); }
   if (state.view === "country") { loadCountries(); loadCases(); }
@@ -1340,6 +1375,163 @@ function renderIdentityLinks(links) {
     '<a class="tag" href="' + esc(x.url) + '" target="_blank" rel="noopener" title="' + esc(x.category + " · " + x.access + " · " + x.status) + '">' +
     esc(x.label) + "</a>").join("") + "</div>";
 }
+
+/* ------------------------------------------------------------------ modules */
+function moduleStatusPill(status) {
+  const colour = status === "verified" ? "ok" : status === "fragile" ? "warn" : status === "blocked" || status === "error" ? "err" : "purple";
+  return '<span class="pill ' + colour + '">' + esc(status) + "</span>";
+}
+
+async function loadModules() {
+  $("modulesSummary").innerHTML = '<div class="stat"><div class="v"><span class="spinner"></span></div><div class="l">loading modules</div></div>';
+  try {
+    const params = new URLSearchParams({ limit: "1000" });
+    const q = $("moduleFilter").value.trim();
+    if (q) params.set("q", q);
+    const selectedCategory = $("moduleCategory").value;
+    const selectedStatus = $("moduleStatus").value;
+    const selectedProbe = $("moduleProbe").value;
+    if (selectedCategory) params.set("categories", selectedCategory);
+    if (selectedStatus) params.set("statuses", selectedStatus);
+    if (selectedProbe) params.set("probe_types", selectedProbe);
+    const [s, m] = await Promise.all([
+      api("/api/module-registry/summary"),
+      api("/api/module-registry/modules?" + params.toString()),
+    ]);
+    state.modulesLoaded = true;
+    state.moduleRegistry = s;
+    state.moduleModules = m.modules || [];
+    $("modulesSummary").innerHTML = [
+      ["declared", s.total || 0], ["verified", s.verified || 0], ["fragile", s.fragile || 0],
+      ["automatic", s.automatic || 0], ["adapter", s.adapter || 0], ["candidate", s.candidate || 0],
+      ["optional key", s.optional_key || 0], ["link-out", s.link_out || 0],
+      ["blocked", s.blocked || 0], ["error", s.error || 0],
+    ].map(([l, v]) => '<div class="stat"><div class="v">' + esc(v) + '</div><div class="l">' + esc(l) + "</div></div>").join("");
+    const cats = s.by_category || {};
+    $("moduleCategory").innerHTML = '<option value="">all</option>' + Object.keys(cats).sort().map(c => '<option value="' + esc(c) + '">' + esc(c) + " · " + esc(cats[c]) + "</option>").join("");
+    $("moduleStatus").innerHTML = '<option value="">all</option>' + Object.keys(s.by_status || {}).sort().map(c => '<option value="' + esc(c) + '">' + esc(c) + " · " + esc((s.by_status || {})[c]) + "</option>").join("");
+    $("moduleProbe").innerHTML = '<option value="">all</option>' + Object.keys(s.by_probe || {}).sort().map(c => '<option value="' + esc(c) + '">' + esc(c) + " · " + esc((s.by_probe || {})[c]) + "</option>").join("");
+    $("moduleCategory").value = selectedCategory;
+    $("moduleStatus").value = selectedStatus;
+    $("moduleProbe").value = selectedProbe;
+    renderModules();
+  } catch (e) {
+    $("modulesSummary").innerHTML = '<div class="empty red">' + esc(e.message) + "</div>";
+  }
+}
+
+function renderModules() {
+  const rows = state.moduleModules || [];
+  const selected = new Set(state.moduleSelected || []);
+  $("moduleSelectStatus").textContent = selected.size + " selected";
+  const tbody = document.querySelector("#modulesTable tbody");
+  tbody.innerHTML = rows.map(x =>
+    `<tr><td><input type="checkbox" data-module-id="${esc(x.id)}" ${selected.has(x.id) ? "checked" : ""} onchange="toggleModuleSelection(this)"></td>
+     <td><strong>${esc(x.label)}</strong><div class="mono muted">${esc(x.id)}</div></td>
+     <td><span class="pill">${esc(x.category)}</span></td><td>${esc(x.access)}</td>
+     <td>${moduleStatusPill(x.status)}${x.fragile ? ' <span class="pill orange">fragile</span>' : ""}</td>
+     <td class="mono">${esc(x.probe_type)}</td><td>${esc(x.region)}</td>
+     <td>${x.requires_key ? esc(x.key_env || "required") : ""}</td></tr>`).join("");
+  if (!rows.length) tbody.innerHTML = '<tr><td colspan="8" class="empty">No modules match the filter.</td></tr>';
+}
+
+function toggleModuleSelection(el) {
+  const id = el.dataset.moduleId;
+  const set = new Set(state.moduleSelected || []);
+  if (el.checked) set.add(id); else set.delete(id);
+  state.moduleSelected = [...set];
+  $("moduleSelectStatus").textContent = state.moduleSelected.length + " selected";
+}
+
+function moduleRowTable(rows) {
+  if (!rows || !rows.length) return '<div class="empty">No automatic result from the selected/verified modules.</div>';
+  return '<div class="tablewrap"><table><thead><tr><th>Source</th><th>Title / name</th><th>Detail</th><th>URL</th></tr></thead><tbody>' +
+    rows.map(r => '<tr><td><span class="pill">' + esc(r.source_label || r.source || "source") + '</span></td><td><strong>' + esc(r.title || r.name || "—") + '</strong></td><td>' + esc(r.snippet || r.detail || "") + '</td><td class="mono">' + (r.url ? '<a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(r.url) + '</a>' : "") + '</td></tr>').join("") +
+    '</tbody></table></div>';
+}
+
+async function runModuleSearch() {
+  const q = $("moduleQuery").value.trim();
+  if (!q) return;
+  $("moduleStatusline").innerHTML = '<span class="spinner"></span>running verified modules…';
+  $("moduleCoverage").innerHTML = "";
+  $("moduleResults").innerHTML = "";
+  try {
+    const body = { query: q, limit: 60 };
+    if (state.moduleSelected.length) body.ids = state.moduleSelected;
+    const j = await api("/api/module-registry/search", { method: "POST", body });
+    const cov = j.coverage || {};
+    $("moduleStatusline").textContent = (j.count || 0) + " results in " + (j.elapsed_ms || 0) + " ms";
+    $("moduleCoverage").innerHTML = '<div class="stats">' + [
+      ["results", j.count || 0], ["planned", cov.planned || 0], ["executed", cov.executed || 0],
+      ["ok", cov.ok || 0], ["empty", cov.empty || 0], ["blocked", cov.blocked || 0],
+      ["errors", cov.error || 0], ["link-outs", (j.link_outs || []).length],
+    ].map(([l, v]) => '<div class="stat"><div class="v">' + esc(v) + '</div><div class="l">' + esc(l) + "</div></div>").join("") + '</div>' +
+      '<div class="card"><div class="badge">why this result set</div><p class="desc">' + esc(j.diagnostics?.reason || j.note || "") + '</p></div>';
+    $("moduleResults").innerHTML = moduleRowTable(j.results || []);
+    if ((j.link_outs || []).length) {
+      $("moduleResults").innerHTML += '<div class="card"><div class="badge">public link-outs</div><div class="row">' +
+        j.link_outs.slice(0, 200).map(x => '<a class="tag" href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.label) + '</a>').join("") + '</div></div>';
+    }
+  } catch (e) {
+    $("moduleStatusline").textContent = "error: " + e.message;
+  }
+}
+
+async function verifyModules() {
+  if (!state.moduleSelected.length) {
+    $("moduleStatusline").textContent = "select at least one module first";
+    return;
+  }
+  $("moduleStatusline").innerHTML = '<span class="spinner"></span>verifying selected modules (2 checks)…';
+  try {
+    const j = await api("/api/module-registry/verify", { method: "POST", body: {
+      ids: state.moduleSelected,
+      query: $("moduleQuery").value.trim() || "John Smith",
+      checks: 2,
+      persist: true,
+    }});
+    $("moduleStatusline").textContent = "verified " + (j.verified || 0) + " · fragile " + (j.fragile || 0) + " · blocked " + (j.blocked || 0) + " · error " + (j.error || 0);
+    $("moduleCoverage").innerHTML = '<div class="stats">' + [
+      ["checked", j.checked || 0], ["verified", j.verified || 0], ["fragile", j.fragile || 0],
+      ["blocked", j.blocked || 0], ["error", j.error || 0], ["empty", j.empty || 0],
+      ["unstable", j.unstable || 0],
+    ].map(([l, v]) => '<div class="stat"><div class="v">' + esc(v) + '</div><div class="l">' + esc(l) + "</div></div>").join("") + '</div>';
+    $("moduleResults").innerHTML = '<details class="card"><summary>verification detail</summary><pre class="mono" style="white-space:pre-wrap;max-height:420px;overflow:auto">' + esc(JSON.stringify(j.results, null, 2)) + '</pre></details>';
+    await loadModules();
+  } catch (e) {
+    $("moduleStatusline").textContent = "error: " + e.message;
+  }
+}
+
+async function buildModuleLinks() {
+  const q = $("moduleQuery").value.trim();
+  if (!q) return;
+  $("moduleStatusline").innerHTML = '<span class="spinner"></span>building module link-outs…';
+  try {
+    const j = await api("/api/module-registry/links", { method: "POST", body: { query: q, limit: 250 } });
+    $("moduleStatusline").textContent = (j.count || 0) + " module link-outs";
+    $("moduleResults").innerHTML = '<div class="card"><div class="badge">module link-outs</div><div class="row">' +
+      (j.links || []).map(x => '<a class="tag" href="' + esc(x.url) + '" target="_blank" rel="noopener" title="' + esc(x.category + " · " + x.access + " · " + x.status) + '">' + esc(x.label) + '</a>').join("") + '</div></div>';
+  } catch (e) {
+    $("moduleStatusline").textContent = "error: " + e.message;
+  }
+}
+
+$("moduleSearchGo").onclick = runModuleSearch;
+$("moduleVerifyGo").onclick = verifyModules;
+$("moduleLinksGo").onclick = buildModuleLinks;
+$("moduleReload").onclick = loadModules;
+$("moduleFilter").onkeydown = e => { if (e.key === "Enter") loadModules(); };
+$("moduleCategory").onchange = loadModules;
+$("moduleStatus").onchange = loadModules;
+$("moduleProbe").onchange = loadModules;
+$("moduleSelectVisible").onclick = () => {
+  const visible = (state.moduleModules || []).map(x => x.id);
+  const all = visible.every(id => state.moduleSelected.includes(id));
+  state.moduleSelected = all ? [] : visible;
+  renderModules();
+};
 
 /* ------------------------------------------------------------------ sources */
 async function loadSources() {

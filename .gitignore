@@ -25,3 +25,6 @@ venv/
 *.log
 data/*.db-wal
 data/*.db-shm
+data/module_registry_status.json
+data/operator_keys.json
+data/.operator_keys.key

@@ -33,9 +33,9 @@ def unavailable(name):
 
 
 def register_all(app, CAPS, user_fn):
-    from . import p1a, p1b, p1c, p2a, p2b, p3, p4, p5, p6, p7
+    from . import p1a, p1b, p1c, p2a, p2b, p3, p4, p5, p6, p7, p8
     ok = 0
-    groups = (p1a, p1b, p1c, p2a, p2b, p3, p4, p5, p6, p7)
+    groups = (p1a, p1b, p1c, p2a, p2b, p3, p4, p5, p6, p7, p8)
     for grp in groups:
         try:
             grp.register(app, CAPS, user_fn, AUTH, _mod, unavailable)
@@ -92,4 +92,6 @@ EXTRA_META = {
     "imgreverse": "Public reverse-image lookup: 14 public engines (11 link-out) plus keyless Trace.moe and optional-key APIs; face-search engines excluded",
     "identity": "Identity intelligence: comma/suffix normalization, always-on variants, extra keyless people/academic/archive/code indexes, public-record pass, dedupe, confidence and per-source coverage",
     "source_registry": "Unified 402-source public registry with access mode, adapter, key requirement, verified/adapter/optional-key/link-out/blocked/error status and public link-out builder",
+    "module_registry": "Declarative module registry: generic JSON/profile/search/oEmbed/adapter/link-out probes, live verification overlay, dedupe/ranking and honest coverage",
+    "operator_compat": "Legacy dashboard compatibility: operator key store, /api/lookup deep-search view, breach lookup, deterministic briefing and Snort/YARA rule helpers",
 }

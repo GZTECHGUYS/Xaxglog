@@ -3,7 +3,7 @@
 State-grade OSINT intelligence platform. Unified build combining 4 open-source
 upstreams + a native deep-search engine + an agency-grade investigation core
 (cases, entity graph, chain-of-custody evidence, watchlists, reports), plus a
-45-module expansion across Parts 1-6 spanning live CT/host monitoring,
+multi-part expansion across Parts 1-8 spanning live CT/host monitoring,
 transport & imagery, media/document forensics, identity/finance,
 marketplace/community intelligence, social-pattern and broker-exposure
 analysis, public records, country-scoped search, broad public social search
@@ -18,6 +18,8 @@ and reverse-image lookup.
 | `deep_search` | Xaxglog-native | International username/email/phone/domain/IP/person/name/social profile/company/geo via free sources (no Docker, no keys required) |
 | `identity` | Xaxglog-native | Name/identity orchestrator: comma/suffix/initial normalization, always-on variants, keyless people/academic/archive/code/records adapters, a general web pass, dedupe, confidence and per-source coverage |
 | `source_registry` | Xaxglog-native | Unified 402-source public catalog: verified/adapter/optional-key/link-out/blocked/error status, per-category plans, public link-out builder and live verification |
+| `module_registry` | Xaxglog-native | Declarative 405-module control plane: generic JSON/profile/search/oEmbed/adapter/link-out probes, live verification overlay, dedupe/ranking, coverage diagnostics and honest automatic-evidence counts |
+| `operator_compat` | Xaxglog-native | Legacy dashboard compatibility: owner-only operator key store, `/api/lookup` deep-search view, breach lookup, deterministic briefing and Snort/YARA rule helpers |
 | `recon` | Xaxglog-native | Chained deep-recon pipeline engine (dependency-aware fan-out, evidence capture, graph emission) |
 | `trackers` | Xaxglog-native | Subject trackers: fingerprint+diff change watchers over DNS, WHOIS, ports, content, wallets, ALPR, breach/sanctions, LEI, news, Telegram, plus pattern new-contact/contact-drop/cadence shifts (daemon + typed alerts) |
 | `darkweb` | Xaxglog-native | Indexed dark-web search (Ahmia + optional IntelX) + breach-corpus lookups |
@@ -64,7 +66,10 @@ Xaxglog/
     modules/imgreverse/    # imgreverse.py — public reverse-image links + keyless/optional APIs
     modules/identity/      # identity.py + adapters.py — normalization, variants, orchestration
     modules/source_registry/ # source_registry.py — unified public-source catalog + plans
+    modules/module_registry/ # declarative ModuleSpec registry, generic probes, engine, verification store
+    modules/operator_compat/ # legacy dashboard compatibility helpers
     routes/p7.py           # identity + source-registry API group
+    routes/p8.py           # module registry + legacy dashboard compatibility
     modules/recon/         # pipeline.py — chained recon engine
     modules/darkweb/       # darkweb.py — indexed dark-web + breach search
     modules/simswap/       # simswap.py — SIM-swap risk detection
@@ -83,7 +88,7 @@ Xaxglog/
     modules/screening/     # screening.py — OFAC/UN sanctions screening
     modules/infra/         # infra.py — PTR/ASN/hosting pivot
     modules/<45 more>/     # Part 1-6 expansion modules (see below)
-    routes/                # extra-module route groups (p1a..p6)
+    routes/                # extra-module route groups (p1a..p8)
     templates/index.html   # built-in web UI (no build step, served at /)
   frontend/                # React operator console (login + tabbed dashboard)
   catalog/tools/*.md       # curated directory
@@ -114,7 +119,7 @@ npm install && npm start
 # UI -> http://localhost:3000 (set REACT_APP_API=http://127.0.0.1:5000)
 ```
 
-The built-in console at `/` includes eleven workspaces:
+The built-in console at `/` includes twelve workspaces:
 
 - **Search** — auto-detect plus username/email/phone/domain/IP/person/social/location/profile/company/place modes, with depth/public-records/code-index controls, profile cards, lead cards, category filters and JSON export.
 - **Identity** — comma/suffix/initial normalization, always-on name and handle variants, keyless people/academic/archive/code/records adapters, a general web pass, dedupe/confidence ranking, per-source coverage diagnostics and public link-outs.
@@ -127,6 +132,7 @@ The built-in console at `/` includes eleven workspaces:
 - **Broker** — public people-search exposure sweep with hit/blocked/clean statuses.
 - **Records** — procurement awards, lobbying disclosures, and nonprofit/Form 990 lookups.
 - **Sources** — unified source registry from `GET /api/sources/registry` with category/access/status filters, public link-out builder and live keyless-adapter verification. The older platform catalog remains at `GET /api/deep/sources`.
+- **Modules** — declarative module registry from `GET /api/module-registry/summary`: generic probe types, honest verified/fragile/adapter/candidate/blocked counts, filterable module table, verified search, two-check live verification and browser link-outs.
 
 ## Identity intelligence & unified source registry
 
@@ -173,8 +179,60 @@ monitoring feeds. Direct Google/Bing result-page scraping is intentionally not
 used; those engines stay as official APIs (optional key) or clearly marked
 link-outs.
 
-The React operator console exposes the same features as **Identity** and
-**Source Registry** tabs.
+The React operator console exposes the same features as **Search**,
+**Modules**, **Identity** and **Source Registry** tabs. The old `/lookup` path
+is kept as a compatibility view over `POST /api/deep/search`.
+
+## Declarative module registry
+
+The registry replaces "one Python file per website" with a small declarative
+contract and generic probe types: `json_api_probe`, `http_profile_probe`,
+`html_search_probe`, `oembed_probe`, `adapter_probe` and `link_out`. A module is
+only automatic evidence when it is `verified` (API/adapter) or `fragile`
+(live-checked public scrape). Adapter, candidate, optional-key, link-out,
+blocked and error sources stay catalog-only.
+
+| Endpoint | What it does |
+|---|---|
+| `GET /api/module-registry/summary` | Honest counts by status, probe, category and access |
+| `GET /api/module-registry/modules?status=verified&category=people&limit=100` | Filtered module list |
+| `GET /api/module-registry/modules/<id>` | One module including its probe payload |
+| `POST /api/module-registry/search` | Run verified/fragile modules; dedupe, rank, per-source coverage and "why empty" diagnostics |
+| `POST /api/module-registry/verify` | Live-check selected ids (analyst+); two checks by default; persists an owner-only overlay |
+| `GET/POST /api/module-registry/links` | Build browser link-outs (never API URLs) |
+
+Current honest snapshot from this host:
+
+| Metric | Count |
+|---|---:|
+| Declared modules | **405** |
+| Live-verified APIs/adapters | **70** |
+| Live-verified fragile scrapes | **14** |
+| Automatic evidence modules | **84** |
+| Adapter-ready (not rechecked) | **9** |
+| Candidate probes | **156** |
+| Optional-key | **20** |
+| Link-out | **118** |
+| Blocked from this host | **15** |
+| Hard endpoint error | **3** |
+
+This is deliberately not a padded Osintly-style count. Osintly's 1,835 public
+entries are useful as a candidate list, but its execution is CAPTCHA/credit
+gated and its backend is closed. Xaxglog's realistic target is 300–600
+genuinely verified/queryable modules plus 1,000+ link-outs. See
+`docs/MODULE_REGISTRY.md` for the probe contract, status semantics, verification
+rules and how to add a source.
+
+### Legacy dashboard compatibility
+
+The unified app now registers the routes the React dashboard already called but
+which were missing: `GET/POST/DELETE /api/keys`, `POST /api/validate-key`,
+`GET /api/lookup`, `GET /api/breach-lookup`, `POST /api/ai-summary`,
+`POST /api/template-rules`, `POST /api/generate-rules` and
+`POST /api/bulk-protect`. The key store is owner-only and uses Fernet when
+`cryptography` is installed; the briefing/rules fallbacks are deterministic and
+do not require a paid model key. `/api/stats` and `/api/threats` return valid
+empty/zero shapes when the optional threat-intel stack is unavailable.
 
 ## Deep search — international coverage
 

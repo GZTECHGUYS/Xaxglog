@@ -5,7 +5,10 @@ import sqlite3
 from database import get_connection
 from datetime import datetime
 from dotenv import load_dotenv
-from cryptography.fernet import Fernet
+try:
+    from cryptography.fernet import Fernet
+except Exception:  # optional dependency; saved-key decryption is disabled
+    Fernet = None
 import os
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
@@ -24,10 +27,13 @@ _FERNET_KEY_FILE = os.path.join(os.path.dirname(__file__), '.encryption_key')
 
 
 def _load_fernet():
-    if not os.path.exists(_FERNET_KEY_FILE):
+    if Fernet is None or not os.path.exists(_FERNET_KEY_FILE):
         return None
-    with open(_FERNET_KEY_FILE, 'rb') as f:
-        return Fernet(f.read())
+    try:
+        with open(_FERNET_KEY_FILE, 'rb') as f:
+            return Fernet(f.read())
+    except Exception:
+        return None
 
 
 def _saved_key(service):

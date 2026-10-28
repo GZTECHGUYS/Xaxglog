@@ -9,12 +9,13 @@ import { ReconPanel, AttributionPanel, DarkWebPanel, SimSwapPanel, SS7Panel, Cas
 import { GeoPanel, VehiclePanel, CctvPanel, IotPanel, CorporatePanel, CryptoPanel, ScreenPanel, InfraPanel } from './IntelPanels';
 import { IdentityPanel, SourceRegistryPanel } from './IdentityPanels';
 import { PlaybookPanel, GlobalCorpPanel, WorldRiskPanel, GeoExtraPanel, AiBriefPanel, TrackersPanel } from './DeepPanels';
+import { DeepSearchPanel, ModuleRegistryPanel } from './SearchPanels';
 
 const API = process.env.REACT_APP_API
   ? `${process.env.REACT_APP_API.replace(/\/$/, '')}/api`
   : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
     ? `${window.location.protocol}//${window.location.hostname}:5000/api`
-    : 'https://osint-app-8c1i.onrender.com/api';
+    : `${window.location.origin}/api`;
 
 // token persisted after login; attached to every request
 const getToken = () => { try { return localStorage.getItem('xg_token'); } catch { return null; } };
@@ -121,7 +122,7 @@ export default function App() {
   };
   const doLogout = () => {
     localStorage.removeItem('xg_token'); localStorage.removeItem('xg_user');
-    setUser(null); setTab('threat');
+    setUser(null); setSavedServices([]); setTab('threat');
   };
 
   const api = axios.create({ baseURL: API, withCredentials: true });
@@ -132,8 +133,10 @@ export default function App() {
   });
 
   useEffect(() => {
+    if (!user) { setSavedServices([]); return; }
     api.get('/keys').then(res => setSavedServices(res.data.services || [])).catch(() => {});
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const saveKey = async (service) => {
     const key = keyInputs[service];
@@ -179,9 +182,18 @@ export default function App() {
       api.get('/threats'),
       api.get('/alerts?min_score=30')
     ]).then(([statsRes, threatsRes, alertsRes]) => {
-      setStats(statsRes.data);
-      setThreats(threatsRes.data.threats);
-      setAlerts(alertsRes.data.alerts || []);
+      const st = statsRes.data || {};
+      // /api/stats returns by_source as [{source,c}], while the header renders
+      // an object. Normalise here so both old and new shapes work.
+      st.by_source = Array.isArray(st.by_source)
+        ? Object.fromEntries(st.by_source.map(x => [x.source, x.c]))
+        : (st.by_source || {});
+      setStats(st);
+      const rows = Array.isArray(threatsRes.data)
+        ? threatsRes.data
+        : (threatsRes.data?.threats || []);
+      setThreats(rows);
+      setAlerts(alertsRes.data?.alerts || []);
       setLoading(false);
     }).catch(err => {
       console.error('Failed to fetch data:', err);
@@ -394,7 +406,7 @@ export default function App() {
       <div style={{display:'flex', gap:6, flexWrap:'wrap', padding:'0 20px 16px',
         borderBottom:'1px solid #30363d', marginBottom:16}}>
         {[
-          ['threat','Threat Intel'],['cases','Cases & Graph'],['identity','Identity'],['social','Social Media'],['imagerev','Image Reverse'],['country','Country Scope'],['recon','Deep Recon'],['sources','Source Registry'],
+          ['search','Search'],['modules','Modules'],['threat','Threat Intel'],['cases','Cases & Graph'],['identity','Identity'],['social','Social Media'],['imagerev','Image Reverse'],['country','Country Scope'],['recon','Deep Recon'],['sources','Source Registry'],
           ['attribution','Attribution'],['darkweb','Dark Web'],['simswap','SIM-Swap'],['ss7','SS7 Lookup'],
           ['geo','GEOINT Map'],['vehicle','Vehicles'],['cctv','CCTV'],['iot','IoT'],
           ['corporate','Corporate'],['crypto','Crypto'],['screening','Screening'],['infra','Infra Pivot'],
@@ -417,6 +429,8 @@ export default function App() {
       <div style={s.content}>
 
         {/* OPERATOR PANELS (non-threat tabs) */}
+        {tab==='search'     && <DeepSearchPanel api={api} />}
+        {tab==='modules'    && <ModuleRegistryPanel api={api} />}
         {tab==='cases'      && <CasesPanel api={api} />}
         {tab==='identity'   && <IdentityPanel api={api} />}
         {tab==='sources'    && <SourceRegistryPanel api={api} />}

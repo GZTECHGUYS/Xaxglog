@@ -237,7 +237,10 @@ def modules():
 @app.get("/api/threats")
 def threats():
     if not CAPS["threat_intel"]:
-        return jsonify({"error": "threat_intel module unavailable"}), 503
+        # The dashboard must still boot when the optional threat-intel stack
+        # (cryptography/feed keys) is absent.  Return an empty, valid list and
+        # let /api/modules explain which capability is unavailable.
+        return jsonify([])
     ti_db, _, _ = TI
     conn = ti_db.get_connection()
     cur = conn.cursor()
@@ -259,15 +262,19 @@ def threats():
 @app.get("/api/stats")
 def stats():
     if not CAPS["threat_intel"]:
-        return jsonify({"error": "threat_intel module unavailable"}), 503
+        return jsonify({
+            "total": 0, "active": 0, "by_source": [], "by_type": [],
+            "warning": "threat_intel module unavailable; live deep search and the module registry still work",
+        })
     ti_db, _, _ = TI
     conn = ti_db.get_connection()
     cur = conn.cursor()
     total = cur.execute("SELECT COUNT(*) c FROM threat_indicators").fetchone()["c"]
+    active = cur.execute("SELECT COUNT(*) c FROM threat_indicators WHERE is_active=1").fetchone()["c"]
     by_source = [dict(r) for r in cur.execute("SELECT source,COUNT(*) c FROM threat_indicators GROUP BY source").fetchall()]
     by_type = [dict(r) for r in cur.execute("SELECT indicator_type,COUNT(*) c FROM threat_indicators GROUP BY indicator_type").fetchall()]
     conn.close()
-    return jsonify({"total": total, "by_source": by_source, "by_type": by_type})
+    return jsonify({"total": total, "active": active, "by_source": by_source, "by_type": by_type})
 
 @app.post("/api/collect")
 def collect_now():
