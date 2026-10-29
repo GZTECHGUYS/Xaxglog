@@ -115,16 +115,27 @@ try:
 except Exception as e:
     log.warning("threat_intel unavailable: %s", e)
 
+wt = ft = pt = None
 try:
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "modules", "forensics"))
     import web_tools as wt
-    import file_tools as ft
-    import pid_tools as pt
     CAPS["forensics"] = True
-    FORENSICS = (wt, ft, pt)
-    log.info("forensics module loaded")
+    log.info("forensics web_tools loaded")
 except Exception as e:
-    log.warning("forensics unavailable: %s", e)
+    log.warning("forensics web_tools unavailable: %s", e)
+try:
+    import file_tools as ft
+except Exception as e:
+    log.warning("forensics file_tools unavailable: %s", e)
+try:
+    import pid_tools as pt
+except Exception as e:
+    log.warning("forensics pid_tools unavailable: %s", e)
+FORENSICS = (wt, ft, pt)
+if CAPS["forensics"]:
+    missing = [n for n, m in (("exif", ft), ("phone", pt)) if m is None]
+    if missing:
+        log.warning("forensics partially available; missing: %s", ", ".join(missing))
 
 from modules.runner import executor as EX
 
@@ -163,7 +174,11 @@ def ui():
 
 @app.get("/api/health")
 def health():
-    return jsonify({"status": "ok", "app": "Xaxglog", "modules": CAPS,
+    enabled = sum(1 for value in CAPS.values() if value)
+    return jsonify({"status": "ok", "app": "Xaxglog", "version": "1.1.0",
+                    "modules": CAPS, "module_count": len(CAPS),
+                    "modules_enabled": enabled,
+                    "platform_phases": 12,
                     "time": datetime.datetime.utcnow().isoformat()})
 
 @app.get("/api/modules")
@@ -350,6 +365,9 @@ def forensics_exif():
     if not CAPS["forensics"]:
         return jsonify({"error": "forensics module unavailable"}), 503
     _, ft, _ = FORENSICS
+    if ft is None:
+        return jsonify({"error": "forensics EXIF support unavailable",
+                        "hint": "install Pillow and exifread"}), 503
     if "file" not in request.files:
         return jsonify({"error": "multipart 'file' required"}), 400
     f = request.files["file"]
@@ -365,6 +383,8 @@ def forensics_phone():
     if not CAPS["forensics"]:
         return jsonify({"error": "forensics module unavailable"}), 503
     _, _, pt = FORENSICS
+    if pt is None:
+        return jsonify({"error": "forensics phone support unavailable"}), 503
     num = request.args.get("number", "")
     if not num:
         return jsonify({"error": "?number= required"}), 400

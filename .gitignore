@@ -28,3 +28,9 @@ data/*.db-shm
 data/module_registry_status.json
 data/operator_keys.json
 data/.operator_keys.key
+data/module_packs/
+data/plugins/
+data/outputs/support/
+dist/
+build/
+*.spec.bak

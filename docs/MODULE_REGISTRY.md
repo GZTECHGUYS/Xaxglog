@@ -123,6 +123,19 @@ Never executed automatically. The engine returns it in `link_outs` only.
 5. Add a test with a mocked `fetch`/adapter. Never make the unit suite depend on
    a live third-party site.
 
+## Installed module packs
+
+Module packs are versioned JSON bundles of declarative modules. Installed packs
+live in `data/module_packs/` and are loaded by the registry on startup or after
+`reload()`. A pack cannot self-certify `verified`/`fragile`: probe modules enter
+as `candidate` and link-outs as `link_out` until a live verification pass from
+this host changes the overlay. Disabling or rolling back a pack rewrites the
+pack file's `enabled` flag and reloads the registry, so disabled modules do not
+linger after a restart.
+
+Install/validate/rollback endpoints are under `/api/platform/packs*`; see
+`docs/PHASES.md` and `sdk/sign_pack.py` for HMAC signing.
+
 ## API
 
 | Endpoint | What it does |

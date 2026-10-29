@@ -1,0 +1,12 @@
+{
+  "name": "example-linkout",
+  "version": "1.0.0",
+  "kind": "link_out",
+  "label": "Example public search link-out",
+  "description": "A declarative plugin example. The server never executes plugin code.",
+  "author": "xaxglog-examples",
+  "min_app": "1.1.0",
+  "probe_type": "link_out",
+  "url": "https://example.org/search?q={query}",
+  "permissions": ["link_out"]
+}

@@ -20,6 +20,7 @@ and reverse-image lookup.
 | `source_registry` | Xaxglog-native | Unified 402-source public catalog: verified/adapter/optional-key/link-out/blocked/error status, per-category plans, public link-out builder and live verification |
 | `module_registry` | Xaxglog-native | Declarative 405-module control plane: generic JSON/profile/search/oEmbed/adapter/link-out probes, live verification overlay, dedupe/ranking, coverage diagnostics and honest automatic-evidence counts |
 | `operator_compat` | Xaxglog-native | Legacy dashboard compatibility: owner-only operator key store, `/api/lookup` deep-search view, breach lookup, deterministic briefing and Snort/YARA rule helpers |
+| `platform_ops` | Xaxglog-native | Phase 1–12 services: evidence graph/timeline/provenance, source health, social coverage, runtime/self-test, signed module packs, offline cache, security posture, team workspaces, performance, plugin SDK, compliance and observability |
 | `recon` | Xaxglog-native | Chained deep-recon pipeline engine (dependency-aware fan-out, evidence capture, graph emission) |
 | `trackers` | Xaxglog-native | Subject trackers: fingerprint+diff change watchers over DNS, WHOIS, ports, content, wallets, ALPR, breach/sanctions, LEI, news, Telegram, plus pattern new-contact/contact-drop/cadence shifts (daemon + typed alerts) |
 | `darkweb` | Xaxglog-native | Indexed dark-web search (Ahmia + optional IntelX) + breach-corpus lookups |
@@ -68,8 +69,13 @@ Xaxglog/
     modules/source_registry/ # source_registry.py — unified public-source catalog + plans
     modules/module_registry/ # declarative ModuleSpec registry, generic probes, engine, verification store
     modules/operator_compat/ # legacy dashboard compatibility helpers
+    modules/platform/      # Phase 1-12 graph, packs, offline, collab, plugins, compliance, ops
     routes/p7.py           # identity + source-registry API group
     routes/p8.py           # module registry + legacy dashboard compatibility
+    routes/p9.py           # Phase 1-12 platform API group
+  packaging/               # PyInstaller spec, Windows/Linux/deb/AppImage build scripts
+  sdk/                     # declarative plugin SDK + pack signing helper
+  packs/                   # example signed module pack manifest
     modules/recon/         # pipeline.py — chained recon engine
     modules/darkweb/       # darkweb.py — indexed dark-web + breach search
     modules/simswap/       # simswap.py — SIM-swap risk detection
@@ -98,6 +104,19 @@ Xaxglog/
 
 ## Quickstart (no Docker)
 
+The launcher repairs the common fresh-clone failure
+`sh: 1: react-scripts: not found` by installing frontend dependencies when
+`frontend/node_modules` is absent:
+
+```bash
+./start.sh                 # backend + React dev server
+./start.sh --backend-only  # built-in console only: http://127.0.0.1:5000/
+./start.sh --frontend-only # React only
+./start.sh --build         # production React build
+```
+
+Manual backend start:
+
 ```bash
 cd Xaxglog/backend
 pip install -r requirements.txt
@@ -115,11 +134,11 @@ React operator console (optional):
 
 ```bash
 cd Xaxglog/frontend
-npm install && npm start
+./start.sh                 # installs node_modules on first run, then starts
 # UI -> http://localhost:3000 (set REACT_APP_API=http://127.0.0.1:5000)
 ```
 
-The built-in console at `/` includes twelve workspaces:
+The built-in console at `/` includes thirteen workspaces:
 
 - **Search** — auto-detect plus username/email/phone/domain/IP/person/social/location/profile/company/place modes, with depth/public-records/code-index controls, profile cards, lead cards, category filters and JSON export.
 - **Identity** — comma/suffix/initial normalization, always-on name and handle variants, keyless people/academic/archive/code/records adapters, a general web pass, dedupe/confidence ranking, per-source coverage diagnostics and public link-outs.
@@ -133,6 +152,32 @@ The built-in console at `/` includes twelve workspaces:
 - **Records** — procurement awards, lobbying disclosures, and nonprofit/Form 990 lookups.
 - **Sources** — unified source registry from `GET /api/sources/registry` with category/access/status filters, public link-out builder and live keyless-adapter verification. The older platform catalog remains at `GET /api/deep/sources`.
 - **Modules** — declarative module registry from `GET /api/module-registry/summary`: generic probe types, honest verified/fragile/adapter/candidate/blocked counts, filterable module table, verified search, two-check live verification and browser link-outs.
+- **Platform** — Phase 1–12 control plane: evidence graph/timeline/provenance, source health, social coverage (direct APIs vs public search link-outs vs handle-only), runtime/self-test, signed module packs, offline mode, security posture, team workspaces, performance benchmark, plugin SDK, compliance and diagnostics.
+
+## Compiled distributions (Windows `.exe`, Linux `.deb`)
+
+The engine is a plain Python process plus SQLite/FTS5; the built-in console
+needs no Node runtime. Build one-folder artifacts (faster start, fewer AV false
+positives) with:
+
+```bash
+python -m pip install pyinstaller
+python packaging/build.py --target deb        # dist/Xaxglog + dist/*.deb
+python packaging/build.py --target appimage   # optional, needs linuxdeploy
+```
+
+On Windows:
+
+```powershell
+./packaging/build_windows.ps1                 # dist/Xaxglog/Xaxglog.exe
+./packaging/build_windows.ps1 -CertThumbprint <THUMBPRINT>  # signed
+```
+
+CI (`.github/workflows/release.yml`) builds and tests Linux and Windows
+artifacts. See `docs/DISTRIBUTION.md` for signing, packaging and reproducibility,
+and `docs/PHASES.md` for the Phase 1–12 endpoint/acceptance map. Runtime
+diagnostics are at `/api/platform/runtime`, `/api/platform/health` and
+`/api/platform/metrics`.
 
 ## Identity intelligence & unified source registry
 

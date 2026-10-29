@@ -10,6 +10,7 @@ import { GeoPanel, VehiclePanel, CctvPanel, IotPanel, CorporatePanel, CryptoPane
 import { IdentityPanel, SourceRegistryPanel } from './IdentityPanels';
 import { PlaybookPanel, GlobalCorpPanel, WorldRiskPanel, GeoExtraPanel, AiBriefPanel, TrackersPanel } from './DeepPanels';
 import { DeepSearchPanel, ModuleRegistryPanel } from './SearchPanels';
+import { PlatformPanel } from './PlatformPanels';
 
 const API = process.env.REACT_APP_API
   ? `${process.env.REACT_APP_API.replace(/\/$/, '')}/api`
@@ -406,7 +407,7 @@ export default function App() {
       <div style={{display:'flex', gap:6, flexWrap:'wrap', padding:'0 20px 16px',
         borderBottom:'1px solid #30363d', marginBottom:16}}>
         {[
-          ['search','Search'],['modules','Modules'],['threat','Threat Intel'],['cases','Cases & Graph'],['identity','Identity'],['social','Social Media'],['imagerev','Image Reverse'],['country','Country Scope'],['recon','Deep Recon'],['sources','Source Registry'],
+          ['search','Search'],['modules','Modules'],['platform','Platform'],['threat','Threat Intel'],['cases','Cases & Graph'],['identity','Identity'],['social','Social Media'],['imagerev','Image Reverse'],['country','Country Scope'],['recon','Deep Recon'],['sources','Source Registry'],
           ['attribution','Attribution'],['darkweb','Dark Web'],['simswap','SIM-Swap'],['ss7','SS7 Lookup'],
           ['geo','GEOINT Map'],['vehicle','Vehicles'],['cctv','CCTV'],['iot','IoT'],
           ['corporate','Corporate'],['crypto','Crypto'],['screening','Screening'],['infra','Infra Pivot'],
@@ -431,6 +432,7 @@ export default function App() {
         {/* OPERATOR PANELS (non-threat tabs) */}
         {tab==='search'     && <DeepSearchPanel api={api} />}
         {tab==='modules'    && <ModuleRegistryPanel api={api} />}
+        {tab==='platform'   && <PlatformPanel api={api} />}
         {tab==='cases'      && <CasesPanel api={api} />}
         {tab==='identity'   && <IdentityPanel api={api} />}
         {tab==='sources'    && <SourceRegistryPanel api={api} />}

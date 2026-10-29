@@ -2,25 +2,48 @@ import logging
 
 log = logging.getLogger("xaxglog")
 import http.cookiejar
+import urllib.error
 import urllib.request
 from urllib.parse import urlparse, urljoin
 from urllib.request import urlopen
 from urllib import parse, robotparser, request
 import requests
-import ipinfo
 from dotenv import load_dotenv
-import dns.resolver
-import ssl
-from cryptography import x509
-from cryptography.hazmat.backends import default_backend
 from concurrent.futures import ThreadPoolExecutor
 import socket
 import os
 import re
 
+# Optional forensic dependencies.  The module is part of the core capability
+# map, so a missing *optional* package must degrade one check instead of
+# taking the whole module (and the dashboard's module count) offline.
+try:
+    import ipinfo
+except ImportError:  # pragma: no cover - depends on the host image
+    ipinfo = None
+
+try:
+    import dns.resolver
+except ImportError:  # pragma: no cover
+    dns = None
+
+try:
+    import ssl
+    from cryptography import x509
+    from cryptography.hazmat.backends import default_backend
+except ImportError:  # pragma: no cover
+    ssl = None
+    x509 = None
+    default_backend = None
+
 # for screenshot
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+try:
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+except ImportError:  # pragma: no cover
+    webdriver = None
+    Options = None
+
 import base64
 
 
@@ -122,6 +145,9 @@ ipinfo_api_key = os.getenv('IPINFO_API_KEY')
 
 
 def get_ip_info(ip_address):
+    if ipinfo is None:
+        return {"error": "ipinfo package not installed",
+                "hint": "pip install ipinfo (optional) or use the deep IP module"}
     try:
         handler = ipinfo.getHandler(ipinfo_api_key)
 
@@ -129,10 +155,14 @@ def get_ip_info(ip_address):
         return (details.all)
     except ValueError as e:
         return {'Error': f'{e}'}
+    except Exception as e:
+        return {'Error': f'{e}'}
 
 
 def get_records(domain):
     results = {}
+    if dns is None:
+        return {"error": "dnspython package not installed"}
     record_types = ['NONE', 'A', 'NS', 'MD', 'MF', 'CNAME', 'SOA', 'MB', 'MG', 'MR', 'NULL', 'WKS', 'PTR', 'HINFO', 'MINFO', 'MX', 'TXT', 'RP', 'AFSDB', 'X25', 'ISDN', 'RT', 'NSAP', 'NSAP-PTR', 'SIG', 'KEY', 'PX', 'GPOS', 'AAAA', 'LOC', 'NXT', 'SRV', 'NAPTR', 'KX', 'CERT', 'A6',
                     'DNAME', 'OPT', 'APL', 'DS', 'SSHFP', 'IPSECKEY', 'RRSIG', 'NSEC', 'DNSKEY', 'DHCID', 'NSEC3', 'NSEC3PARAM', 'TLSA', 'HIP', 'CDS', 'CDNSKEY', 'CSYNC', 'SPF', 'UNSPEC', 'EUI48', 'EUI64', 'TKEY', 'TSIG', 'IXFR', 'AXFR', 'MAILB', 'MAILA', 'ANY', 'URI', 'CAA', 'TA', 'DLV']
 
@@ -151,6 +181,8 @@ def get_records(domain):
 
 
 def get_ssl(hostname, port=443):
+    if ssl is None or x509 is None:
+        return {"error": "cryptography package not installed (TLS inspection unavailable)"}
     context = ssl.create_default_context()
     conn = context.wrap_socket(socket.socket(
         socket.AF_INET, socket.SOCK_STREAM), server_hostname=hostname)
@@ -181,7 +213,7 @@ def get_sitemaps(website, timeout=5):
         rp.set_url(robotstxturl)
         rp.read()
         sitemaps = rp.site_maps()
-    except error.URLError as e:
+    except urllib.error.URLError as e:
         if isinstance(e.reason, socket.timeout):
             log.warning(f"Timeout Error: {e}")
         else:
@@ -284,6 +316,8 @@ def whois_info(domain):
 
 
 def get_screenshot(url):
+    if webdriver is None or Options is None:
+        return {"error": "selenium package not installed (screenshot unavailable)"}
     chrome_options = Options()
     # Run Chrome in headless mode (no GUI)
     chrome_options.add_argument('--headless')

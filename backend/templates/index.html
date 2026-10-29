@@ -136,6 +136,7 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
     <button data-view="records">Records</button>
     <button data-view="sources">Sources</button>
     <button data-view="modules">Modules</button>
+    <button data-view="platform">Platform</button>
   </nav>
 
   <div id="loginPanel" class="card hidden">
@@ -592,6 +593,38 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
     </div>
   </section>
 
+  <!-- ============================================================ PLATFORM -->
+  <section class="view" id="view-platform">
+    <div class="card">
+      <h2>Platform phases <span class="pill purple">1–12</span></h2>
+      <p class="desc">Evidence graph, source health, social coverage, lightweight runtime, signed module packs, offline mode, security posture, team workspaces, performance, plugin SDK, compliance and observability. These are real API-backed capabilities; source counts stay registry-derived and are not padded.</p>
+      <div class="stats" id="platformSummary"><div class="empty">Login and load the phase overview.</div></div>
+      <div class="row" style="margin-top:12px;align-items:flex-end">
+        <button class="orange" id="platformLoad">Load overview</button>
+        <button class="ghost small" id="platformSelfTest">Run self-test</button>
+        <button class="ghost small" id="platformSecurity">Security posture</button>
+        <button class="ghost small" id="platformBenchmark">Benchmark</button>
+        <span class="statusline" id="platformStatus"></span>
+      </div>
+      <div id="platformPhases" style="margin-top:12px"></div>
+    </div>
+    <div class="card">
+      <div class="row" style="align-items:flex-end">
+        <div style="flex:1;min-width:180px"><label class="badge">case id (0 = unscoped)</label><input id="platformCase" value="0"/></div>
+        <div style="flex:2;min-width:220px"><label class="badge">social name (no network unless probe checked)</label><input id="platformName" placeholder="Jane Doe"/></div>
+        <label class="badge"><input type="checkbox" id="platformProbe"/> live probe</label>
+        <button class="ghost small" id="platformGraph">Graph bundle</button>
+        <button class="ghost small" id="platformSocial">Social coverage</button>
+      </div>
+      <div class="row" style="margin-top:10px;align-items:flex-end">
+        <div style="flex:2;min-width:220px"><label class="badge">workspace name</label><input id="platformWorkspace" placeholder="Case Alpha team"/></div>
+        <button class="ghost small" id="platformWorkspaceGo">Create workspace</button>
+        <button class="ghost small" id="platformDiagnostics">Diagnostics</button>
+      </div>
+      <pre id="platformOut" style="margin-top:12px;max-height:520px;overflow:auto">No platform action yet.</pre>
+    </div>
+  </section>
+
   <!-- ============================================================ SOURCES -->
   <section class="view" id="view-sources">
     <div class="card">
@@ -633,6 +666,7 @@ const state = {
   profileFilter: "all",
   sourcesLoaded: false,
   modulesLoaded: false,
+  platformLoaded: false,
   moduleRegistry: null,
   moduleSelected: [],
   socialCatalogLoaded: false,
@@ -673,6 +707,7 @@ document.querySelectorAll(".nav button").forEach(b => b.onclick = () => {
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "view-" + state.view));
   if (state.view === "sources" && !state.sourcesLoaded) loadSources();
   if (state.view === "modules" && !state.modulesLoaded) loadModules();
+  if (state.view === "platform" && !state.platformLoaded) loadPlatform();
   if (state.view === "social") { loadSocialCatalog(); loadCases(); }
   if (state.view === "imagerev") { loadImgrevCatalog(); loadCases(); }
   if (state.view === "country") { loadCountries(); loadCases(); }
@@ -976,10 +1011,16 @@ function renderCoverage(j) {
     }
     if (cov.note) html += '<p class="desc" style="margin-top:10px">' + esc(cov.note) + "</p>";
   } else if (cov.mode === "name") {
-    html += `<p class="desc">Handle matrix: <strong>${esc(cov.total_platforms || 0)}</strong> platforms. Display-name APIs cover <strong>${esc(cov.name_searchable || 0)}</strong> of them directly, plus <strong>${esc((cov.additional_name_indexes || []).length)}</strong> additional academic/profile indexes and <strong>${esc(cov.people_index_sources || 0)}</strong> people-index sources. The other <strong>${esc((cov.not_name_searchable || []).length)}</strong> need a known handle/profile URL — Xaxglog does not bypass login walls.</p>`;
-    html += '<div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin:10px 0 6px">name-searchable sources</div><div class="row">' + chips(cov.checked_platforms) + "</div>";
-    if ((cov.not_name_searchable || []).length) {
-      html += `<details style="margin-top:12px"><summary class="muted">${esc((cov.not_name_searchable || []).length)} platforms need a handle/profile URL</summary><div class="row" style="margin-top:8px">${chips(cov.not_name_searchable)}</div></details>`;
+    const direct = cov.direct_name_apis != null ? cov.direct_name_apis : cov.name_searchable;
+    const links = cov.public_search_link_out_count != null ? cov.public_search_link_out_count : (cov.public_search_link_out || []).length;
+    const handleOnly = cov.handle_only_count != null ? cov.handle_only_count : (cov.handle_only || cov.not_name_searchable || []).length;
+    html += `<p class="desc">Handle matrix: <strong>${esc(cov.total_platforms || 0)}</strong> platforms. <strong>${esc(direct || 0)}</strong> have a direct display-name API, <strong>${esc(links || 0)}</strong> have a public search link-out (leads only; login/consent walls possible), and <strong>${esc(handleOnly || 0)}</strong> require a known handle/profile URL. Plus <strong>${esc((cov.additional_name_indexes || []).length)}</strong> academic/profile indexes and <strong>${esc(cov.people_index_sources || 0)}</strong> people-index sources.</p>`;
+    html += '<div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin:10px 0 6px">direct name-search sources</div><div class="row">' + chips(cov.checked_platforms) + "</div>";
+    if ((cov.public_search_link_out || []).length) {
+      html += `<details style="margin-top:12px"><summary class="muted">${esc((cov.public_search_link_out || []).length)} platforms have a public search link-out</summary><div class="row" style="margin-top:8px">${chips(cov.public_search_link_out)}</div></details>`;
+    }
+    if ((cov.handle_only || []).length) {
+      html += `<details style="margin-top:12px"><summary class="muted">${esc((cov.handle_only || []).length)} platforms require a handle/profile URL</summary><div class="row" style="margin-top:8px">${chips(cov.handle_only)}</div></details>`;
     }
   } else {
     const bs = cov.by_status || {};
@@ -1532,6 +1573,80 @@ $("moduleSelectVisible").onclick = () => {
   state.moduleSelected = all ? [] : visible;
   renderModules();
 };
+
+/* ----------------------------------------------------------------- platform */
+function platformOut(value) {
+  $("platformOut").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+}
+
+async function loadPlatform() {
+  state.platformLoaded = true;
+  $("platformStatus").innerHTML = '<span class="spinner"></span>loading phase overview…';
+  try {
+    const j = await api("/api/platform/overview");
+    const a = j.analytics || {};
+    const s = a.graph || {};
+    const cov = a.social_coverage || {};
+    $("platformSummary").innerHTML = [
+      ["phases", (j.phases || {}).count || 0],
+      ["entities", s.entities || 0],
+      ["artifacts", s.artifacts || 0],
+      ["timeline", s.timeline_events || 0],
+      ["workspaces", s.workspaces || 0],
+      ["direct name APIs", cov.direct_name_apis || 0],
+      ["search link-outs", cov.public_search_link_out || 0],
+      ["handle-only", cov.handle_only || 0],
+    ].map(([l, v]) => '<div class="stat"><div class="v">' + esc(v) + '</div><div class="l">' + esc(l) + "</div></div>").join("");
+    $("platformPhases").innerHTML = ((j.phases || {}).phases || []).map(p =>
+      '<div class="card" style="margin-top:10px"><div class="row" style="justify-content:space-between">' +
+      '<strong>' + esc(p.id) + ". " + esc(p.name) + '</strong><span class="pill ' +
+      (p.status === "implemented" ? "green" : "info") + '">' + esc(p.status) + "</span></div>" +
+      '<p class="desc" style="margin:6px 0">' + esc((p.capabilities || []).join(" · ")) + "</p>" +
+      '<div class="row">' + (p.endpoints || []).map(e => '<span class="tag">' + esc(e) + "</span>").join("") + "</div></div>"
+    ).join("");
+    $("platformStatus").textContent = "loaded " + ((j.phases || {}).count || 0) + " phases";
+    platformOut({ runtime: j.runtime, offline: j.offline, analytics: a });
+  } catch (e) {
+    $("platformStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+  }
+}
+
+async function platformAction(label, fn) {
+  $("platformStatus").innerHTML = '<span class="spinner"></span>' + esc(label) + "…";
+  try {
+    const j = await fn();
+    $("platformStatus").textContent = label + " · ok";
+    platformOut(j);
+  } catch (e) {
+    $("platformStatus").innerHTML = '<span class="red">' + esc(e.message) + "</span>";
+    platformOut({ error: e.message, status: e.status || 0, detail: e.data || null });
+  }
+}
+
+$("platformLoad").onclick = loadPlatform;
+$("platformSelfTest").onclick = () => platformAction("self-test", () => api("/api/platform/runtime/self-test", { method: "POST", body: {} }));
+$("platformSecurity").onclick = () => platformAction("security posture", () => api("/api/platform/security/posture"));
+$("platformBenchmark").onclick = () => platformAction("benchmark", () => api("/api/platform/performance/benchmark", { method: "POST", body: { iterations: 20 } }));
+$("platformGraph").onclick = () => {
+  const cid = $("platformCase").value.trim() || "0";
+  return platformAction("graph bundle", () => api("/api/platform/graph/bundle?case_id=" + encodeURIComponent(cid)));
+};
+$("platformSocial").onclick = () => {
+  const name = $("platformName").value.trim();
+  if (!name) { $("platformStatus").textContent = "enter a name"; return; }
+  return platformAction("social recon", () => api("/api/platform/social/recon", {
+    method: "POST", body: { name, probe: $("platformProbe").checked,
+      case_id: Number($("platformCase").value || 0) },
+  }));
+};
+$("platformWorkspaceGo").onclick = () => {
+  const name = $("platformWorkspace").value.trim();
+  if (!name) { $("platformStatus").textContent = "enter a workspace name"; return; }
+  return platformAction("workspace", () => api("/api/platform/workspaces", {
+    method: "POST", body: { name },
+  }));
+};
+$("platformDiagnostics").onclick = () => platformAction("diagnostics", () => api("/api/platform/support/diagnostics"));
 
 /* ------------------------------------------------------------------ sources */
 async function loadSources() {
@@ -2280,8 +2395,9 @@ function downloadJSON(obj, name) {
 
 /* ------------------------------------------------------------------ boot */
 api("/api/health").then(j => {
-  const on = Object.entries(j.modules || {}).filter(([, v]) => v).map(([k]) => k);
-  $("health").textContent = "backend ok · " + on.length + " modules";
+  const all = Object.entries(j.modules || {});
+  const on = all.filter(([, v]) => v).map(([k]) => k);
+  $("health").textContent = "backend ok · " + on.length + "/" + all.length + " modules";
   $("health").title = on.join(" + ");
   $("health").className = "badge ok";
 }).catch(() => { $("health").textContent = "backend unreachable"; $("health").className = "badge err"; });

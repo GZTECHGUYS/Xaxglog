@@ -207,6 +207,103 @@ PLATFORMS = [
 PLATFORM_META = {name: {"category": cat, "region": region}
                  for name, _tmpl, cat, region in PLATFORMS}
 
+# Public search pages that accept a free-form name/query.  These are *link-outs*
+# only: they are never treated as automatic evidence because many sites show a
+# login wall, a consent gate or a captcha depending on region/rate limit.  The
+# coverage report distinguishes them from direct name-search APIs so "not
+# returned" is not mistaken for "does not exist".
+PUBLIC_SEARCH = {
+    "X/Twitter": "https://x.com/search?q={q}&src=typed_query&f=user",
+    "Instagram": "https://www.instagram.com/web/search/topsearch/?query={q}",
+    "Facebook": "https://www.facebook.com/public/{q}",
+    "Threads": "https://www.threads.net/search?q={q}",
+    "Bluesky": "https://bsky.app/search?q={q}",
+    "Mastodon": "https://mastodon.social/search?q={q}",
+    "TikTok": "https://www.tiktok.com/search/user?q={q}",
+    "Snapchat": "https://www.snapchat.com/search?q={q}",
+    "Pinterest": "https://www.pinterest.com/search/users/?q={q}",
+    "Tumblr": "https://www.tumblr.com/search/{q}",
+    "Reddit": "https://www.reddit.com/search/?q={q}&type=user",
+    "Quora": "https://www.quora.com/search?q={q}",
+    "Medium": "https://medium.com/search?q={q}",
+    "Substack": "https://substack.com/search/{q}",
+    "About.me": "https://about.me/search?q={q}",
+    "Linktree": "https://linktr.ee/search?q={q}",
+    "Gravatar": "https://gravatar.com/search?q={q}",
+    "Keybase": "https://keybase.io/search?q={q}",
+    "Gab": "https://gab.com/search?q={q}",
+    "Gettr": "https://gettr.com/search?q={q}",
+    "Truth Social": "https://truthsocial.com/search?q={q}",
+    "VK": "https://vk.com/search?c%5Bsection%5D=people&c%5Bq%5D={q}",
+    "OK.ru": "https://ok.ru/search?st.query={q}",
+    "Weibo": "https://s.weibo.com/user?q={q}",
+    "Douyin": "https://www.douyin.com/search/{q}?type=user",
+    "Zhihu": "https://www.zhihu.com/search?type=people&q={q}",
+    "Douban": "https://www.douban.com/search?q={q}",
+    "Bilibili": "https://search.bilibili.com/all?keyword={q}",
+    "LinkedIn": "https://www.linkedin.com/search/results/people/?keywords={q}",
+    "Fiverr": "https://www.fiverr.com/search/gigs?query={q}",
+    "Freelancer": "https://www.freelancer.com/search/users/?q={q}",
+    "GitHub": "https://github.com/search?q={q}&type=users",
+    "GitLab": "https://gitlab.com/search?search={q}&scope=users",
+    "Codeberg": "https://codeberg.org/explore/users?q={q}",
+    "SourceHut": "https://sr.ht/search?q={q}",
+    "DockerHub": "https://hub.docker.com/search?q={q}&type=user",
+    "NPM": "https://www.npmjs.com/search?q={q}",
+    "PyPI": "https://pypi.org/search/?q={q}",
+    "Crates.io": "https://crates.io/search?q={q}",
+    "HuggingFace": "https://huggingface.co/search/full-text?q={q}",
+    "Replit": "https://replit.com/search?q={q}",
+    "Codepen": "https://codepen.io/search/pens?q={q}",
+    "Kaggle": "https://www.kaggle.com/search?q={q}",
+    "Dev.to": "https://dev.to/search?q={q}",
+    "HackerNews": "https://hn.algolia.com/?q={q}",
+    "LeetCode": "https://leetcode.com/search/?q={q}",
+    "HackerOne": "https://hackerone.com/search?query={q}",
+    "Bugcrowd": "https://bugcrowd.com/search?search={q}",
+    "TryHackMe": "https://tryhackme.com/search?q={q}",
+    "Exercism": "https://exercism.org/search?q={q}",
+    "FreeCodeCamp": "https://www.freecodecamp.org/news/search?query={q}",
+    "Behance": "https://www.behance.net/search/users?search={q}",
+    "Dribbble": "https://dribbble.com/search/{q}",
+    "Flickr": "https://www.flickr.com/search/?text={q}&type=people",
+    "500px": "https://500px.com/search?q={q}",
+    "ArtStation": "https://www.artstation.com/search?q={q}",
+    "DeviantArt": "https://www.deviantart.com/search?q={q}",
+    "Unsplash": "https://unsplash.com/s/photos/{q}",
+    "VSCO": "https://vsco.co/search/{q}",
+    "Wattpad": "https://www.wattpad.com/search/{q}",
+    "AO3": "https://archiveofourown.org/users/search?query={q}",
+    "WordPress": "https://wordpress.com/read/search?q={q}",
+    "YouTube": "https://www.youtube.com/results?search_query={q}",
+    "Vimeo": "https://vimeo.com/search?q={q}",
+    "Dailymotion": "https://www.dailymotion.com/search/{q}/users",
+    "Twitch": "https://www.twitch.tv/search?term={q}",
+    "Rumble": "https://rumble.com/search?q={q}",
+    "Odysee": "https://odysee.com/$/search?q={q}",
+    "Spotify": "https://open.spotify.com/search/{q}/profiles",
+    "SoundCloud": "https://soundcloud.com/search/people?q={q}",
+    "Last.fm": "https://www.last.fm/search?q={q}",
+    "Bandcamp": "https://bandcamp.com/search?q={q}",
+    "Steam": "https://steamcommunity.com/search/users/#text={q}",
+    "Xbox": "https://www.xbox.com/en-US/search?q={q}",
+    "Roblox": "https://www.roblox.com/search/users?keyword={q}",
+    "Patreon": "https://www.patreon.com/search?q={q}",
+    "BuyMeACoffee": "https://www.buymeacoffee.com/search?q={q}",
+    "Ko-fi": "https://ko-fi.com/search?q={q}",
+    "Gumroad": "https://gumroad.com/discover?query={q}",
+    "Etsy": "https://www.etsy.com/search?q={q}",
+    "eBay": "https://www.ebay.com/sch/i.html?_nkw={q}",
+    "ResearchGate": "https://www.researchgate.net/search/researcher?q={q}",
+    "Academia.edu": "https://www.academia.edu/search?q={q}",
+    "Goodreads": "https://www.goodreads.com/search?q={q}",
+    "Letterboxd": "https://letterboxd.com/search/{q}/",
+    "Duolingo": "https://www.duolingo.com/search?query={q}",
+    "MyFitnessPal": "https://www.myfitnesspal.com/search?q={q}",
+    "Untappd": "https://untappd.com/search?q={q}",
+    "Ravelry": "https://www.ravelry.com/people/search?query={q}",
+}
+
 # Platform detection for scraped URLs / search results.
 SOCIAL_HOSTS = {
     "x.com": "X/Twitter", "twitter.com": "X/Twitter",
@@ -970,35 +1067,81 @@ NAME_PLATFORM_META = {
 }
 
 
+def name_search_links(name):
+    """Return the public search/profile links for a free-form name.
+
+    ``mode`` is one of ``direct_api`` (a name API is wired), ``search_link``
+    (a public search page exists, but it is only a lead and may show a login or
+    consent wall) or ``handle_only`` (no name search; a known handle/profile URL
+    is required).  Search links are deliberately not auto-scraped.
+    """
+    name = re.sub(r"\s+", " ", (name or "").strip())
+    q = urllib.parse.quote_plus(name)
+    rows = []
+    direct = set(NAME_PLATFORM_META.get(k, ("", ""))[0] for k in PEOPLE_SOURCES)
+    for platform, _tmpl, category, region in PLATFORMS:
+        if platform in direct:
+            mode = "direct_api"
+            url = ""
+        elif platform in PUBLIC_SEARCH:
+            mode = "search_link"
+            url = PUBLIC_SEARCH[platform].format(q=q)
+        else:
+            mode = "handle_only"
+            url = ""
+        rows.append({
+            "platform": platform,
+            "category": category,
+            "region": region,
+            "mode": mode,
+            "url": url,
+            "requires_handle": mode == "handle_only",
+            "automatic_evidence": False,
+        })
+    rows.sort(key=lambda r: ({"direct_api": 0, "search_link": 1,
+                              "handle_only": 2}[r["mode"]], r["platform"].lower()))
+    return rows
+
+
 def name_search_coverage():
     """Explicit coverage for display-name search across configured platforms.
 
-    A handle check covers all 93 platforms. A *name* check can only use public
-    name-search APIs; the rest require a known handle or profile URL. Reporting
-    that boundary prevents \"missing\" from being mistaken for \"absent\".
+    A handle check covers all 93 platforms.  A *name* check can use direct
+    public name-search APIs, or open a public search page as a link-out.  Only
+    the direct API result is automatic evidence; search links may be behind a
+    login/consent wall.  Reporting the boundary prevents "not returned" from
+    being mistaken for "does not exist".
     """
     platform_names = {n for n, _t, _c, _r in PLATFORMS}
     all_name_sources = sorted({label for label, _cat in NAME_PLATFORM_META.values()})
     in_handle_matrix = sorted(set(all_name_sources) & platform_names)
     additional_indexes = sorted(set(all_name_sources) - platform_names)
-    unsearchable = sorted(platform_names - set(in_handle_matrix))
+    search_links = sorted((platform_names - set(in_handle_matrix)) & set(PUBLIC_SEARCH))
+    handle_only = sorted(platform_names - set(in_handle_matrix) - set(search_links))
     return {
         "mode": "name",
         "total_platforms": len(platform_names),
         "name_searchable": len(in_handle_matrix),
+        "direct_name_apis": len(in_handle_matrix),
+        "public_search_link_out": search_links,
+        "public_search_link_out_count": len(search_links),
+        "handle_only": handle_only,
+        "handle_only_count": len(handle_only),
         "checked_platforms": all_name_sources,
         "name_search_sources": len(all_name_sources),
         "handle_matrix_name_searchable": in_handle_matrix,
         "additional_name_indexes": additional_indexes,
         "people_index_sources": len(PEOPLE_SOURCES),
-        "not_name_searchable": unsearchable,
-        "note": ("Handle matrix: %d platforms. Display-name APIs cover %d of them "
-                 "directly, plus %d additional academic/profile indexes and %d "
-                 "people-index sources. The other %d platforms require a known "
-                 "handle/profile URL; Xaxglog does not bypass login walls."
+        # Backwards-compatible key: now only the genuinely handle-only set.
+        "not_name_searchable": handle_only,
+        "note": ("Handle matrix: %d platforms. %d have a direct name-search API, "
+                 "%d have a public search link-out (leads only; login/consent "
+                 "walls possible), and %d require a known handle/profile URL. "
+                 "Plus %d additional academic/profile indexes and %d people-index "
+                 "sources. Xaxglog never bypasses login walls."
                  % (len(platform_names), len(in_handle_matrix),
-                    len(additional_indexes), len(PEOPLE_SOURCES),
-                    len(unsearchable))),
+                    len(search_links), len(handle_only),
+                    len(additional_indexes), len(PEOPLE_SOURCES))),
     }
 
 
@@ -1160,6 +1303,7 @@ def name_registry_search(name, variants=True):
         out["status"] = "partial"
     out["platforms"] = normalize_people_platforms(out)
     out["coverage"] = name_search_coverage()
+    out["search_links"] = name_search_links(name)
     return out
 
 

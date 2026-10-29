@@ -1,17 +1,35 @@
-import exifread
-from PIL import Image
-from PIL.ExifTags import TAGS
-from PIL.ExifTags import GPSTAGS
 import os
 import json
+
+# EXIF support is optional: the core app must still boot on a minimal install
+# where Pillow/exifread are deliberately omitted from the runtime image.
+try:
+    import exifread
+except ImportError:  # pragma: no cover
+    exifread = None
+try:
+    from PIL import Image
+    from PIL.ExifTags import TAGS
+    from PIL.ExifTags import GPSTAGS
+except ImportError:  # pragma: no cover
+    Image = None
+    TAGS = {}
+    GPSTAGS = {}
+
 directory = os.path.join(os.path.dirname(__file__), 'static')
 file_name = 'exif_dict.json'
 file_path = os.path.join(directory, file_name)
-with open(file_path, 'r') as json_file:
-    ExifDict = json.load(json_file)
+try:
+    with open(file_path, 'r') as json_file:
+        ExifDict = json.load(json_file)
+except (OSError, ValueError):
+    ExifDict = {}
 
 
 def get_exif(uploaded_file):
+    if Image is None or exifread is None:
+        return {"error": "EXIF support requires Pillow and exifread",
+                "hint": "pip install Pillow exifread (optional)"}
     image = Image.open(uploaded_file)
 
     uploaded_file.seek(0, os.SEEK_END)

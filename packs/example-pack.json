@@ -1,0 +1,26 @@
+{
+  "name": "example-public-sources",
+  "version": "1.0.0",
+  "min_app": "1.1.0",
+  "description": "Example declarative module pack. Install through /api/platform/packs/install.",
+  "publisher": "xaxglog-examples",
+  "modules": [
+    {
+      "id": "example_wikidata_people",
+      "label": "Example Wikidata people search",
+      "category": "people",
+      "probe_type": "json_api_probe",
+      "url": "https://www.wikidata.org/w/api.php?action=wbsearchentities&language=en&format=json&search={query}",
+      "status": "fragile"
+    },
+    {
+      "id": "example_public_link",
+      "label": "Example public search link-out",
+      "category": "web",
+      "probe_type": "link_out",
+      "url": "https://example.org/search?q={query}",
+      "status": "link_out"
+    }
+  ],
+  "sources": ["wikidata"]
+}

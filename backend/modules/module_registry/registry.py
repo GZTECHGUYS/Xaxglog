@@ -18,9 +18,13 @@ Status vocabulary
 from __future__ import annotations
 
 import copy
+import glob
+import json
+import os
 import re
 from collections import Counter
 
+import config as C
 from modules.source_registry import source_registry as SR
 from . import store
 
@@ -291,6 +295,57 @@ def _generic_module(spec):
     }
 
 
+def _pack_specs():
+    """Load declarative modules from installed module packs.
+
+    Pack modules are deliberately *candidate* unless they are link-outs.  A
+    pack cannot self-certify ``verified``/``fragile``: those statuses require a
+    live verification pass from this host.  This keeps the automatic-evidence
+    count honest when a third-party pack is installed.
+    """
+    out = []
+    pack_dir = os.path.join(C.DATA_DIR, "module_packs")
+    for path in sorted(glob.glob(os.path.join(pack_dir, "*.json"))):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                payload = json.load(fh)
+            if payload.get("enabled", True) is False:
+                continue
+            manifest = payload.get("manifest") or payload
+            name = manifest.get("name") or os.path.basename(path)
+            version = manifest.get("version") or ""
+            for raw in manifest.get("modules") or []:
+                if not isinstance(raw, dict):
+                    continue
+                ptype = raw.get("probe_type") or "link_out"
+                probe = {"type": ptype}
+                if raw.get("url"):
+                    probe["url"] = raw["url"]
+                if raw.get("search"):
+                    probe["search"] = raw["search"]
+                if raw.get("search_url"):
+                    probe["search_url"] = raw["search_url"]
+                out.append({
+                    "id": raw.get("id"),
+                    "label": raw.get("label") or raw.get("id"),
+                    "category": raw.get("category") or "web",
+                    "types": raw.get("types") or ["name"],
+                    "region": raw.get("region") or "global",
+                    "language": raw.get("language") or "en",
+                    "access": "link_out" if ptype == "link_out" else "api",
+                    "status": "link_out" if ptype == "link_out" else "candidate",
+                    "probe": probe,
+                    "homepage": raw.get("homepage") or raw.get("url") or "",
+                    "search_url": raw.get("search_url") or raw.get("search") or "",
+                    "profile_url": raw.get("profile_url") or "",
+                    "note": f"module pack {name}@{version}",
+                    "tags": list(raw.get("tags") or []) + ["module-pack"],
+                })
+        except Exception:
+            continue
+    return out
+
+
 def _apply_overlay(module, overlay):
     item = overlay.get(module["id"]) or {}
     if not item:
@@ -314,6 +369,11 @@ def _build():
         mod = _module_from_source(src)
         _MODULES[mod["id"]] = _apply_overlay(mod, _STATUS)
     for spec in GENERIC_MODULES:
+        mod = _generic_module(spec)
+        _MODULES[mod["id"]] = _apply_overlay(mod, _STATUS)
+    for spec in _pack_specs():
+        if not spec.get("id") or spec["id"] in _MODULES:
+            continue
         mod = _generic_module(spec)
         _MODULES[mod["id"]] = _apply_overlay(mod, _STATUS)
     _recount()
