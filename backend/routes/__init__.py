@@ -88,7 +88,7 @@ EXTRA_META = {
     "lobbying": "US Senate LDA lobbying disclosures: client/registrant search, lobbyists, issues, income/expenses",
     "nonprofit": "ProPublica Nonprofit Explorer: IRS-registered nonprofits, EIN lookup, Form 990 financial summaries",
     "countryscope": "Country-scoped search: selected-country registry/procurement/court/charity links plus GLEIF, USAspending/TED, nonprofit/lobbying and domain/IP country checks",
-    "socialscrape": "Broad international public social-media search/scrape: 168-platform catalog, federated/regional engines, public-page metadata, media URLs and case evidence",
+    "socialscrape": "Broad international public social-media search/scrape: 187-platform catalog, federated/regional engines, public-page metadata, media URLs and case evidence",
     "imgreverse": "Public reverse-image lookup: 14 public engines (11 link-out) plus keyless Trace.moe and optional-key APIs; face-search engines excluded",
     "identity": "Identity intelligence: comma/suffix normalization, always-on variants, extra keyless people/academic/archive/code indexes, public-record pass, dedupe, confidence and per-source coverage",
     "source_registry": "Unified 402-source public registry with access mode, adapter, key requirement, verified/adapter/optional-key/link-out/blocked/error status and public link-out builder",

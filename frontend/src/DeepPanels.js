@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
-const S = {
+import { S as CYBER_S } from './cyberTheme';
+
+// Legacy values are kept for any panel-specific keys; CYBERDECK theme
+// values win for every shared key.
+const LEGACY_S = {
   section:{background:'#161b22',border:'1px solid #30363d',borderRadius:8,padding:20,marginBottom:20},
   title:{margin:'0 0 4px',fontSize:16,color:'#e6edf3'},
   sub:{margin:'0 0 14px',fontSize:12,color:'#8b949e'},
@@ -14,7 +18,9 @@ const S = {
   label:{fontSize:11,color:'#8b949e',display:'block',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.04em'},
   select:{background:'#0d1117',border:'1px solid #30363d',color:'#e6edf3',borderRadius:6,padding:'9px 10px',fontSize:13},
   pre:{fontFamily:'ui-monospace,Menlo,monospace',fontSize:11,color:'#8b949e',whiteSpace:'pre-wrap',maxHeight:320,overflowY:'auto',background:'#010409',padding:10,borderRadius:6,margin:0},
+
 };
+const S = { ...LEGACY_S, ...CYBER_S };
 const Err = ({e}) => e ? <div style={{...S.card,border:'1px solid #e74c3c',background:'#2a1a1a',color:'#e74c3c',fontSize:13}}>{typeof e==='string'?e:JSON.stringify(e)}</div> : null;
 const KV = ({k,v}) => <div><span style={{color:'#8b949e'}}>{k}: </span><span style={{color:'#e6edf3'}}>{v??'—'}</span></div>;
 const St = ({s}) => <span style={{...S.pill,background:s==='ok'||s==='ok|blocked'||s==='valid'?'#2ecc71':(s==='blocked'||s==='not_found'?'#e67e22':'#8b949e')}}>{String(s||'—')}</span>;

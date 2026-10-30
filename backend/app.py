@@ -42,6 +42,11 @@ except Exception:
 app = Flask(__name__, template_folder="templates")
 app.secret_key = C.FLASK_SECRET_KEY
 CORS(app)
+# Flask's default jsonify sorts dict keys (sort_keys=True); any module that
+# builds a dict with mixed key types (e.g. int HTTP codes + str status words)
+# then crashes the whole request with a 500. That was the live "network error"
+# failure on /api/deep/search. Keep insertion order instead.
+app.json.sort_keys = False
 
 # ---------------------------------------------------------------- core platform: db + auth
 import auth as AUTH
@@ -100,7 +105,6 @@ except Exception as e:
     CAPS["deep_search"] = False
     DEEP = None
     log.warning("deep_search unavailable: %s", e)
-TI = FORENSICS = None
 try:
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "modules", "threat_intel"))
     import database as ti_db
@@ -505,6 +509,7 @@ def _need_deep():
     return None
 
 @app.post("/api/deep/search")
+@AUTH.require("viewer")
 def deep_auto():
     err = _need_deep()
     if err:
@@ -515,6 +520,7 @@ def deep_auto():
     return jsonify(out)
 
 @app.post("/api/deep/username")
+@AUTH.require("viewer")
 def deep_username():
     err = _need_deep()
     if err:
@@ -525,6 +531,7 @@ def deep_username():
     return jsonify(out)
 
 @app.post("/api/deep/email")
+@AUTH.require("viewer")
 def deep_email():
     err = _need_deep()
     if err:
@@ -535,6 +542,7 @@ def deep_email():
     return jsonify(out)
 
 @app.post("/api/deep/phone")
+@AUTH.require("viewer")
 def deep_phone():
     err = _need_deep()
     if err:
@@ -545,6 +553,7 @@ def deep_phone():
     return jsonify(out)
 
 @app.post("/api/deep/domain")
+@AUTH.require("viewer")
 def deep_domain():
     err = _need_deep()
     if err:
@@ -555,6 +564,7 @@ def deep_domain():
     return jsonify(out)
 
 @app.post("/api/deep/ip")
+@AUTH.require("viewer")
 def deep_ip():
     err = _need_deep()
     if err:
@@ -566,6 +576,7 @@ def deep_ip():
     return jsonify(out)
 
 @app.post("/api/deep/person")
+@AUTH.require("viewer")
 def deep_person():
     err = _need_deep()
     if err:
@@ -616,6 +627,7 @@ def deep_person():
     return jsonify(out)
 
 @app.post("/api/deep/social")
+@AUTH.require("viewer")
 def deep_social():
     err = _need_deep()
     if err:
@@ -627,6 +639,7 @@ def deep_social():
     return jsonify(out)
 
 @app.post("/api/deep/profile")
+@AUTH.require("viewer")
 def deep_profile():
     err = _need_deep()
     if err:
@@ -639,6 +652,7 @@ def deep_profile():
     return jsonify(out), status
 
 @app.post("/api/deep/location")
+@AUTH.require("viewer")
 def deep_location():
     err = _need_deep()
     if err:
@@ -652,6 +666,7 @@ def deep_location():
 
 
 @app.get("/api/deep/sources")
+@AUTH.require("viewer")
 def deep_sources():
     err = _need_deep()
     if err:
@@ -779,6 +794,7 @@ def trackpin_consent_submit(token):
     return jsonify(out)
 
 @app.get("/api/deep/company")
+@AUTH.require("viewer")
 def deep_company():
     err = _need_deep()
     if err:
@@ -789,6 +805,7 @@ def deep_company():
     return jsonify(out)
 
 @app.get("/api/deep/geo")
+@AUTH.require("viewer")
 def deep_geo():
     err = _need_deep()
     if err:
@@ -1115,8 +1132,18 @@ def sweep_now():
 @app.get("/api/alerts")
 @AUTH.require("viewer")
 def list_alerts():
-    return jsonify(CASES.list_alerts(request.args.get("case_id", type=int),
-                                     request.args.get("unack") == "1"))
+    rows = CASES.list_alerts(request.args.get("case_id", type=int),
+                             request.args.get("unack") == "1")
+    try:
+        min_score = request.args.get("min_score", type=int)
+    except Exception:
+        min_score = None
+    if min_score is not None and isinstance(rows, list):
+        rows = [a for a in rows
+                if (a.get("score") is None or a["score"] >= min_score)]
+    # ``{alerts: [...]}`` keeps the shape the operator console expects; older
+    # clients that read the bare list still work via Array.isArray fallback.
+    return jsonify({"alerts": rows})
 
 
 @app.post("/api/alerts/<int:alert_id>/ack")

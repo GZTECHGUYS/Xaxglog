@@ -44,7 +44,7 @@ and reverse-image lookup.
 | `lobbying` | Xaxglog-native | US LDA (lda.gov) lobbying disclosures: client/registrant search, lobbyists, issues, income/expenses |
 | `nonprofit` | Xaxglog-native | ProPublica Nonprofit Explorer: IRS-registered nonprofits, EIN lookup, Form 990 financial summaries |
 | `countryscope` | Xaxglog-native | Country-scoped search: selected-country registry/procurement/court/charity links plus GLEIF, USAspending/TED, nonprofit/lobbying and domain/IP country checks |
-| `socialscrape` | Xaxglog-native | Broad international public social-media search/scrape: 168-platform catalog, federated + regional engines, keyless Reddit/Bluesky/Lemmy APIs, public-page metadata/media, platform search links, case evidence |
+| `socialscrape` | Xaxglog-native | Broad international public social-media search/scrape: 187-platform catalog, federated + regional engines, keyless Reddit/Bluesky/Lemmy/HN/Mastodon APIs, public-page metadata/media, platform search links, case evidence |
 | `imgreverse` | Xaxglog-native | Public reverse-image lookup: 14 public engines (11 link-out: Google Lens, Bing, Yandex, TinEye, SauceNAO, IQDB, ascii2d, Baidu, Sogou, Karma Decay, Trace.moe) + keyless Trace.moe and optional-key APIs; face-search engines excluded |
 
 ## Layout
@@ -63,7 +63,7 @@ Xaxglog/
     modules/catalog/       # baseline json
     modules/deep_search/   # connectors.py — international search engine
                            # social.py — platform matrix, people indexes, profile scraper
-    modules/socialscrape/  # socialscrape.py — 168-platform public social search/scrape
+    modules/socialscrape/  # socialscrape.py — 187-platform public social search/scrape
     modules/imgreverse/    # imgreverse.py — public reverse-image links + keyless/optional APIs
     modules/identity/      # identity.py + adapters.py — normalization, variants, orchestration
     modules/source_registry/ # source_registry.py — unified public-source catalog + plans
@@ -142,7 +142,7 @@ The built-in console at `/` includes thirteen workspaces:
 
 - **Search** — auto-detect plus username/email/phone/domain/IP/person/social/location/profile/company/place modes, with depth/public-records/code-index controls, profile cards, lead cards, category filters and JSON export.
 - **Identity** — comma/suffix/initial normalization, always-on name and handle variants, keyless people/academic/archive/code/records adapters, a general web pass, dedupe/confidence ranking, per-source coverage diagnostics and public link-outs.
-- **Social Media** — search a name, handle, hashtag, keyword or public post URL across 168 international platforms; federated/regional engines, keyless public APIs, public-page metadata and platform-native search links.
+- **Social Media** — search a name, handle, hashtag, keyword or public post URL across 187 international platforms; federated/regional engines, keyless public APIs, public-page metadata and platform-native search links.
 - **Image Reverse** — use 14 public reverse-image engines (11 link-out) and run keyless Trace.moe plus optional keyed APIs; face-search/biometric engines are excluded.
 - **Country Scope** — enter a name, company, domain, IP, phone or email, choose a country, and get a country-specific source plan plus live jurisdiction/infrastructure checks.
 - **Intense Recon** — operator login, optional case attachment, live progress, normalized dossier (entities, counts, confidence) and per-axis detail. Calls `POST /api/recon/deep`.
@@ -434,7 +434,7 @@ log in, join private groups, solve captchas or evade anti-bot controls. Input
 can be a name, handle, hashtag, keyword or public profile/post URL. The module
 combines:
 
-- a **168-platform international catalog** with region/category tags and
+- a **187-platform international catalog** with region/category tags and
   platform-native search links (CN, RU, JP, KR, IN, SEA, VN, TH, ID, LATAM,
   MENA, Africa, Europe, North America and global platforms);
 - federated keyless search through DuckDuckGo, SearXNG and Mojeek;
@@ -511,7 +511,7 @@ provider's ToS and rate limits.
 | `POST /api/search/federated` · `/api/search/dork/build` · `/run` | Keyless federated search (DDG/SearX/Mojeek) + dork engine |
 | `GET /api/name/variants` · `/name/homographs` · `POST /name/confusables` | International name variants, IDN homographs, confusables |
 | `GET /api/regional/telegram` · `POST /api/regional/search` | Telegram public channels + Baidu/Yandex/Weibo relay |
-| `POST /api/socialscrape/search` · `GET /api/socialscrape/catalog` | Broad international public social search + 168-platform catalog |
+| `POST /api/socialscrape/search` · `GET /api/socialscrape/catalog` | Broad international public social search + 187-platform catalog |
 | `POST /api/imgreverse/search` · `GET /api/imgreverse/catalog` | Public reverse-image links + keyless/optional API lookup |
 | `POST /api/email/deep` · `/email/header` · `/email/anchor` | Email MX/SPF/DKIM, header hop trace, account-graph anchor |
 | `GET /api/courts/search` · `/api/courts/status` | Global court records (CourtListener, BAILII, AustLII, HUDOC) |

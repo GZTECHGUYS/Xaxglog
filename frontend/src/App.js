@@ -5,6 +5,7 @@ import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 import './App.css';
+import { appShell } from './cyberTheme';
 import { ReconPanel, AttributionPanel, DarkWebPanel, SimSwapPanel, SS7Panel, CasesPanel, CountryPanel, SocialMediaPanel, ImageReversePanel } from './OperatorPanels';
 import { GeoPanel, VehiclePanel, CctvPanel, IotPanel, CorporatePanel, CryptoPanel, ScreenPanel, InfraPanel } from './IntelPanels';
 import { IdentityPanel, SourceRegistryPanel } from './IdentityPanels';
@@ -14,9 +15,7 @@ import { PlatformPanel } from './PlatformPanels';
 
 const API = process.env.REACT_APP_API
   ? `${process.env.REACT_APP_API.replace(/\/$/, '')}/api`
-  : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? `${window.location.protocol}//${window.location.hostname}:5000/api`
-    : `${window.location.origin}/api`;
+  : `${window.location.protocol}//${window.location.hostname}:5000/api`;
 
 // token persisted after login; attached to every request
 const getToken = () => { try { return localStorage.getItem('xg_token'); } catch { return null; } };
@@ -132,6 +131,17 @@ export default function App() {
     if (t) cfg.headers.Authorization = `Bearer ${t}`;
     return cfg;
   });
+  // Expressive failure text: every panel renders `err.message`, so rewrite
+  // axios' bare "Network Error" (no response received) once, globally.
+  api.interceptors.response.use(
+    r => r,
+    err => {
+      if (!err.response) {
+        err.message = `Cannot reach the Xaxglog API at ${API} — is the backend running on port 5000?`;
+      }
+      return Promise.reject(err);
+    }
+  );
 
   useEffect(() => {
     if (!user) { setSavedServices([]); return; }
@@ -194,12 +204,15 @@ export default function App() {
         ? threatsRes.data
         : (threatsRes.data?.threats || []);
       setThreats(rows);
-      setAlerts(alertsRes.data?.alerts || []);
+      // /api/alerts now returns {alerts:[...]}; tolerate a bare array too.
+      setAlerts(Array.isArray(alertsRes.data)
+        ? alertsRes.data : (alertsRes.data?.alerts || []));
       setLoading(false);
     }).catch(err => {
       console.error('Failed to fetch data:', err);
       setLoading(false);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleLookup = async () => {
@@ -362,9 +375,9 @@ export default function App() {
       {/*  HEADER  */}
       <header style={s.header}>
         <div style={{position:'relative', textAlign:'center'}}>
-          <h1 style={s.headerTitle}>OSINT Threat Dashboard</h1>
+          <h1 style={s.headerTitle}>XAXGLOG ▸ OSINT DECK</h1>
           <p style={s.headerSub}>
-            Collect, analyse and respond to cyber threats from {Object.keys(stats?.by_source || {}).length + 9} intelligence sources
+            ⌁ Collect · Analyse · Respond — {Object.keys(stats?.by_source || {}).length + 9} intel feeds online
           </p>
           <button
             style={{...s.keyBtn, ...s.keyBtnPos}}
@@ -414,16 +427,26 @@ export default function App() {
           ['playbooks','Playbooks'],['worldcorp','Global Corp'],['risk','World Risk'],
           ['geoextra','Geo Extra'],['aibrief','AI Brief'],['trackers','Trackers'],
         ].map(([k,label]) => (
-          <button key={k} onClick={()=>setTab(k)} style={{
-            background: tab===k ? '#1f6feb' : '#21262d',
-            color: tab===k ? '#fff' : '#8b949e',
-            border:'none', borderRadius:6, padding:'8px 14px', fontSize:13, fontWeight:600, cursor:'pointer'
+          <button key={k} onClick={()=>setTab(k)}
+            onMouseEnter={e=>{ if(tab!==k) e.currentTarget.style.borderColor='rgba(0,229,255,0.45)'; }}
+            onMouseLeave={e=>{ if(tab!==k){ e.currentTarget.style.borderColor='rgba(0,229,255,0.14)'; e.currentTarget.style.background='rgba(6,14,30,0.7)'; } }}
+            style={{
+            background: tab===k ? 'linear-gradient(135deg, rgba(0,229,255,0.18), rgba(0,110,255,0.14))'
+                                : 'rgba(6,14,30,0.7)',
+            color: tab===k ? '#8bf9ff' : '#5b7f96',
+            textShadow: tab===k ? '0 0 10px rgba(0,229,255,0.8)' : 'none',
+            border: tab===k ? '1px solid #00e5ff' : '1px solid rgba(0,229,255,0.14)',
+            borderRadius: 0,
+            clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))',
+            padding:'8px 14px', fontSize:12, fontWeight:700, cursor:'pointer',
+            letterSpacing:'0.08em', textTransform:'uppercase', fontFamily:'ui-monospace,Menlo,monospace'
           }}>{label}</button>
         ))}
         <div style={{marginLeft:'auto', display:'flex', alignItems:'center', gap:10}}>
-          <span style={{fontSize:12, color:'#8b949e'}}>{user.username} · {user.role}</span>
-          <button onClick={doLogout} style={{background:'#21262d', color:'#e74c3c', border:'1px solid #30363d',
-            borderRadius:6, padding:'7px 12px', fontSize:12, cursor:'pointer'}}>Sign out</button>
+          <span style={{fontSize:12, color:'#5b7f96', fontFamily:'ui-monospace,Menlo,monospace'}}>◉ {user.username} [{user.role}]</span>
+          <button onClick={doLogout} style={{background:'rgba(255,59,92,0.12)', color:'#ff3b5c', border:'1px solid rgba(255,59,92,0.55)',
+            borderRadius:0, padding:'7px 12px', fontSize:12, cursor:'pointer', textTransform:'uppercase',
+            letterSpacing:'0.08em', fontFamily:'ui-monospace,Menlo,monospace'}}>Sign out</button>
         </div>
       </div>
 
@@ -1501,4 +1524,7 @@ const makeStyles = (isMobile) => ({
   modal:    { background:'#161b22', border:'1px solid #30363d', borderRadius:12, padding: isMobile ? '18px 16px' : '24px 28px', maxWidth:560, width:'100%', maxHeight:'85vh', overflowY:'auto' },
   closeBtn: { background:'none', border:'1px solid #30363d', color:'#8b949e', fontSize:18, cursor:'pointer', borderRadius:6, padding:'4px 10px', lineHeight:1 },
   keyRow:   { background:'#0d1117', border:'1px solid #30363d', borderRadius:8, padding:'14px 16px', marginBottom:10 },
+
+  // ---- CYBERDECK skin: theme values win over every key set above ----
+  ...appShell(isMobile),
 });

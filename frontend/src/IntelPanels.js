@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
-const S = {
+import { S as CYBER_S } from './cyberTheme';
+
+// Legacy values are kept for any panel-specific keys; CYBERDECK theme
+// values win for every shared key.
+const LEGACY_S = {
   section:{background:'#161b22',border:'1px solid #30363d',borderRadius:8,padding:20,marginBottom:20},
   title:{margin:'0 0 4px',fontSize:16,color:'#e6edf3'},
   sub:{margin:'0 0 14px',fontSize:12,color:'#8b949e'},
@@ -14,9 +18,27 @@ const S = {
   label:{fontSize:11,color:'#8b949e',display:'block',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.04em'},
   select:{background:'#0d1117',border:'1px solid #30363d',color:'#e6edf3',borderRadius:6,padding:'9px 10px',fontSize:13},
   pre:{fontFamily:'ui-monospace,Menlo,monospace',fontSize:11,color:'#8b949e',whiteSpace:'pre-wrap',maxHeight:260,overflowY:'auto',background:'#010409',padding:10,borderRadius:6,margin:0},
+
 };
+const S = { ...LEGACY_S, ...CYBER_S };
 const Err = ({e}) => e ? <div style={{...S.card,border:'1px solid #e74c3c',background:'#2a1a1a',color:'#e74c3c',fontSize:13}}>{typeof e==='string'?e:JSON.stringify(e)}</div> : null;
 const KV = ({k,v}) => <div><span style={{color:'#8b949e'}}>{k}: </span><span style={{color:'#e6edf3'}}>{v??'—'}</span></div>;
+
+// Download an auth-gated endpoint via the authed axios instance: raw <a href>
+// links cannot attach the Bearer token and always end in 401.
+const dl = async (api, path, filename) => {
+  try {
+    const r = await api.get(path, { responseType: 'blob' });
+    const url = URL.createObjectURL(r.data);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+  } catch (e) {
+    console.error('download failed', e);
+    alert('download failed: ' + (e.message || 'error'));
+  }
+};
 
 // ---------------------------------------------------------------- GEOINT MAP
 export function GeoPanel({ api }) {
@@ -64,8 +86,8 @@ export function GeoPanel({ api }) {
             <input style={{...S.input,width:90}} placeholder="lon" value={q.lon} onChange={e=>setQ({...q,lon:e.target.value})}/>
             <input style={{...S.input,width:110}} placeholder="radius m" value={q.radius} onChange={e=>setQ({...q,radius:e.target.value})}/>
             <button style={{...S.btn,background:'#e67e22'}} onClick={findNear}>Within radius</button>
-            <a style={{...S.btn,background:'#30363d',textDecoration:'none'}} target="_blank" rel="noreferrer" href={`${api.defaults.baseURL}/geo/export/${cid}.geojson`}>GeoJSON</a>
-            <a style={{...S.btn,background:'#30363d',textDecoration:'none'}} target="_blank" rel="noreferrer" href={`${api.defaults.baseURL}/geo/export/${cid}.kml`}>KML</a>
+            <button style={{...S.btn,background:'#30363d'}} onClick={()=>dl(`geo/export/${cid}.geojson`,`case-${cid}.geojson`)}>GeoJSON</button>
+            <button style={{...S.btn,background:'#30363d'}} onClick={()=>dl(`geo/export/${cid}.kml`,`case-${cid}.kml`)}>KML</button>
           </div>
           {near&&<div style={{marginTop:10}}><div style={S.label}>{near.count} within {near.radius_m}m</div>
             {near.results.map((r,i)=><div key={i} style={{...S.card}}><span style={S.tag}>{r.type}</span><span style={{...S.mono,color:'#e6edf3'}}>{r.value}</span><span style={{color:'#8b949e',fontSize:12}}> — {r.distance_m}m</span></div>)}</div>}

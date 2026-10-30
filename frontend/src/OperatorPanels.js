@@ -1,7 +1,30 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { S as CYBER_S } from './cyberTheme';
+
+// Open/download an auth-gated endpoint via the authed axios instance: raw
+// <a href> links cannot attach the Bearer token and always end in 401.
+const openOrDownload = async (api, path, filename) => {
+  try {
+    const r = await api.get(path, { responseType: 'blob' });
+    const url = URL.createObjectURL(r.data);
+    if (filename) {
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+    } else {
+      window.open(url, '_blank');
+    }
+  } catch (e) {
+    console.error('download failed', e);
+  }
+};
 
 // Shared inline styles matching the Xaxglog dark theme.
-const S = {
+
+// Legacy values are kept for any panel-specific keys; CYBERDECK theme
+// values win for every shared key.
+const LEGACY_S = {
   section: { background:'#161b22', border:'1px solid #30363d', borderRadius:8, padding:20, marginBottom:20 },
   title:   { margin:'0 0 4px', fontSize:16, color:'#e6edf3' },
   sub:     { margin:'0 0 14px', fontSize:12, color:'#8b949e' },
@@ -19,7 +42,9 @@ const S = {
   th:      { background:'#161b22', padding:'8px 10px', textAlign:'left', color:'#8b949e', fontWeight:600, borderBottom:'1px solid #30363d' },
   td:      { padding:'8px 10px', borderBottom:'1px solid #21262d', color:'#e6edf3' },
   select:  { background:'#0d1117', border:'1px solid #30363d', color:'#e6edf3', borderRadius:6, padding:'9px 10px', fontSize:13 },
+
 };
+const S = { ...LEGACY_S, ...CYBER_S };
 const sevColour = (s) => ({critical:'#e74c3c',high:'#e67e22',medium:'#f1c40f',low:'#3498db',info:'#8b949e'}[s]||'#8b949e');
 const riskColour = (r) => ({high:'#e74c3c',medium:'#e67e22',low:'#f1c40f',none_detected:'#2ecc71'}[r]||'#8b949e');
 
@@ -385,7 +410,7 @@ export function CasesPanel({ api }) {
   const [form, setForm] = useState({name:'',description:'',legal_basis:''});
   const [search, setSearch] = useState('');
   const [searchRes, setSearchRes] = useState(null);
-  const [evidence, setEvidence] = useState([]);
+  const [, setEvidence] = useState([]);
   const [alertList, setAlertList] = useState([]);
   const [watch, setWatch] = useState({entity_type:'email',entity_value:'',interval_min:360});
   const [msg, setMsg] = useState('');
@@ -431,7 +456,7 @@ export function CasesPanel({ api }) {
   // simple force-ish circular layout for the graph (no external deps)
   const layout = (g) => {
     if (!g) return null;
-    const nodes = g.nodes||[]; const n = nodes.length; const R = 180;
+    const nodes = g.nodes||[];
     const pos = {};
     const byType = {};
     nodes.forEach(nd => { (byType[nd.type] = byType[nd.type]||[]).push(nd); });
@@ -476,10 +501,8 @@ export function CasesPanel({ api }) {
             <div style={S.row}>
               <span style={{...S.mono, color:'#2ecc71', fontSize:11}}>{msg}</span>
               <button style={{...S.btn, background:'#e67e22'}} onClick={sweep}>Sweep watchlist</button>
-              <a href={`${api.defaults.baseURL}/report/${active}/html`} target="_blank" rel="noreferrer"
-                style={{...S.btn, background:'#8957e5', textDecoration:'none'}}>Report</a>
-              <a href={`${api.defaults.baseURL}/export/stix/${active}`} target="_blank" rel="noreferrer"
-                style={{...S.btn, background:'#30363d', textDecoration:'none'}}>STIX</a>
+              <button style={{...S.btn, background:'#8957e5'}} onClick={()=>openOrDownload(api, `report/${active}/html`, `case-${active}-report.html`)}>Report</button>
+              <button style={{...S.btn, background:'#30363d'}} onClick={()=>openOrDownload(api, `export/stix/${active}`, `case-${active}.stix.json`)}>STIX</button>
             </div>
           </div>
           <svg width="440" height="400" style={{background:'#0d1117', border:'1px solid #30363d', borderRadius:8, width:'100%', maxWidth:520}}>
@@ -689,6 +712,7 @@ export function SocialMediaPanel({ api }) {
   const [caseId, setCaseId] = useState('');
   const [scrape, setScrape] = useState(false);
   const [probe, setProbe] = useState(false);
+  const [platFilter, setPlatFilter] = useState('all');
   const [catalog, setCatalog] = useState(null);
   const [res, setRes] = useState(null);
   const [err, setErr] = useState('');
@@ -723,12 +747,27 @@ export function SocialMediaPanel({ api }) {
   const summary = res?.summary || {};
   const results = res?.results || [];
   const links = res?.search_links || [];
+  const platOptions = [...new Set(results.map(r => r.platform || r.source || '').filter(Boolean))];
+  const platTint = (name) =>
+    `hsl(${[...(name || 'x')].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7)}, 55%, 40%)`;
+  const fmtWhen = (ts) => {
+    if (!ts) return '';
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return String(ts).slice(0, 19);
+    const diff = (Date.now() - d.getTime()) / 1000;
+    if (diff < 86400) return Math.max(1, Math.floor(diff / 3600)) + 'h ago';
+    if (diff < 2592000) return Math.floor(diff / 86400) + 'd ago';
+    return d.toISOString().slice(0, 10);
+  };
+  const shown = platFilter && platFilter !== 'all'
+    ? results.filter(r => (r.platform || r.source || '') === platFilter)
+    : results;
 
   return (
     <div style={S.section}>
       <h2 style={S.title}>Social Media Search</h2>
       <p style={S.sub}>
-        Broad international public-source search across {catalog?.platforms || '168'} platforms.
+        Broad international public-source search across {catalog?.platforms || '187'} platforms.
         Runs federated search, regional engines and keyless public APIs, then builds
         platform-native search links. Login walls, private groups and captchas are
         reported as blocked — never bypassed. Matches are leads, not identity proof.
@@ -775,26 +814,51 @@ export function SocialMediaPanel({ api }) {
             <span style={S.tag}>{links.length} search links</span>
             <span style={S.tag}>{res.platforms_selected ?? 0} platforms</span>
             <span style={S.tag}>{summary.profiles ?? 0} profile hits</span>
+            {summary.engines_ok > 0 && <span style={S.tag}>{summary.engines_ok} engines ok</span>}
+            {summary.engines_blocked > 0 && <span style={{...S.tag, color:'#e67e22'}}>{summary.engines_blocked} engines blocked</span>}
           </div>
+          {(res.hashtags?.length > 0 || res.mentions?.length > 0) && (
+            <div style={{...S.row, marginBottom:10}}>
+              {res.hashtags?.slice(0, 15).map(t => <span key={'t'+t} style={{...S.tag, color:'#58a6ff'}}>#{t}</span>)}
+              {res.mentions?.slice(0, 15).map(m => <span key={'m'+m} style={{...S.tag, color:'#f1c40f'}}>@{m}</span>)}
+            </div>
+          )}
+          {platOptions.length > 1 && (
+            <select style={{...S.select, marginBottom:10}} value={platFilter} onChange={e=>setPlatFilter(e.target.value)}>
+              <option value="all">all platforms ({results.length})</option>
+              {platOptions.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          )}
           <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))', gap:12}}>
             <div>
-              <div style={S.label}>Public results</div>
-              {results.map((r, i) => (
-                <div key={i} style={S.card}>
+              <div style={S.label}>Public results {platFilter !== 'all' ? `· ${platFilter}` : ''}</div>
+              {shown.map((r, i) => (
+                <div key={i} style={{...S.card, borderColor: r.engines?.length > 1 ? '#2ecc71' : undefined}}>
                   <div style={{...S.row, marginBottom:4}}>
-                    <span style={S.tag}>{r.platform || r.source || 'result'}</span>
+                    <span style={{...S.tag, background: r.platform ? platTint(r.platform) : undefined}}>
+                      {r.platform || r.source || 'result'}
+                    </span>
                     {r.post_type && <span style={S.tag}>{r.post_type}</span>}
+                    {r.engines?.length > 1 && <span style={{...S.tag, color:'#2ecc71'}}>{r.engines.length} engines agree</span>}
                     {r.source && <span style={{color:'#8b949e', fontSize:11}}>{r.source}</span>}
                   </div>
                   <div style={{color:'#e6edf3', fontSize:13}}>{r.title || r.url}</div>
                   {r.snippet && <div style={{color:'#8b949e', fontSize:12, marginTop:4}}>{r.snippet}</div>}
-                  {(r.author || r.published) && <div style={{color:'#8b949e', fontSize:11, marginTop:4}}>
-                    {[r.author, r.published].filter(Boolean).join(' · ')}
+                  {r.meta && (r.meta.points != null || r.meta.comments != null || r.meta.boosts != null) && (
+                    <div style={{color:'#58a6ff', fontSize:11, marginTop:4}}>
+                      {[r.meta.kind, r.meta.points != null ? `▲ ${r.meta.points}` : '',
+                        r.meta.comments != null ? `💬 ${r.meta.comments}` : '',
+                        r.meta.boosts != null ? `🔁 ${r.meta.boosts}` : '',
+                        r.meta.favourites != null ? `★ ${r.meta.favourites}` : ''].filter(Boolean).join(' · ')}
+                    </div>
+                  )}
+                  {(r.author || r.published) && <div style={{color:'#8b949e', fontSize:11, marginTop:3}}>
+                    {[r.author, r.published ? fmtWhen(r.published) : ''].filter(Boolean).join(' · ')}
                   </div>}
-                  {r.url && <a href={r.url} target="_blank" rel="noopener noreferrer" style={{...S.mono, color:'#58a6ff'}}>{r.url}</a>}
+                  {r.url && <a href={r.url} target="_blank" rel="noopener noreferrer" style={{...S.mono, color:'#58a6ff'}}>{String(r.url).replace(/^https?:\/\//, '').slice(0, 80)}</a>}
                 </div>
               ))}
-              {!results.length && <div style={S.card}>{res.note || 'No public results. Use the platform search links.'}</div>}
+              {!shown.length && <div style={S.card}>{res.note || 'No public results. Use the platform search links.'}</div>}
             </div>
             <div>
               <div style={S.label}>Platform search links</div>

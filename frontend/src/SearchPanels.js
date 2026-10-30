@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
-const S = {
+import { S as CYBER_S } from './cyberTheme';
+
+// Legacy values are kept for any panel-specific keys; CYBERDECK theme
+// values win for every shared key.
+const LEGACY_S = {
   section: { background:'#161b22', border:'1px solid #30363d', borderRadius:8, padding:20, marginBottom:20 },
   title:   { margin:'0 0 4px', fontSize:16, color:'#e6edf3' },
   sub:     { margin:'0 0 14px', fontSize:12, color:'#8b949e', lineHeight:1.55 },
@@ -24,7 +28,9 @@ const S = {
   stat:    { background:'#0d1117', border:'1px solid #30363d', borderRadius:8, padding:'10px 14px', minWidth:96 },
   num:     { display:'block', fontSize:20, fontWeight:700, color:'#e6edf3' },
   statL:   { fontSize:10, color:'#8b949e', textTransform:'uppercase', letterSpacing:'0.05em' },
+
 };
+const S = { ...LEGACY_S, ...CYBER_S };
 
 const Err = ({ e }) => e ? (
   <div style={{ ...S.card, border:'1px solid #e74c3c', background:'#2a1a1a', color:'#e74c3c', fontSize:13 }}>
@@ -61,6 +67,33 @@ function collectRows(node, out = [], depth = 0) {
   return out;
 }
 
+const relatizeTime = (ts) => {
+  if (!ts) return '';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return String(ts).slice(0, 19);
+  const diff = (Date.now() - d.getTime()) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  if (diff < 2592000) return Math.floor(diff / 86400) + 'd ago';
+  return d.toISOString().slice(0, 10);
+};
+
+const platColour = (name) =>
+  `hsl(${[...(name || '')].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7)}, 55%, 40%)`;
+
+const confColour = (c) => ({
+  high:'#2ecc71', medium:'#1f6feb', low:'#9b59b6', lead:'#8b949e',
+})[String(c || '').toLowerCase()] || null;
+
+function MatchBadge({ row }) {
+  const m = typeof row.match === 'number' ? row.match : null;
+  if (m == null && !row.confidence) return null;
+  const c = confColour(row.confidence);
+  const label = m != null ? `match ${(m * 100).toFixed(0)}%` : row.confidence;
+  return <span style={{ ...S.pill, background: c || '#30363d', fontSize:10 }}>{label}</span>;
+}
+
 function ResultTable({ rows, empty }) {
   if (!rows.length) {
     return <div style={{ ...S.card, color:'#8b949e', fontSize:13 }}>{empty || 'No automatic result for this group.'}</div>;
@@ -70,24 +103,43 @@ function ResultTable({ rows, empty }) {
       <table style={S.table}>
         <thead><tr>
           <th style={S.th}>Source</th><th style={S.th}>Title / name</th>
-          <th style={S.th}>Detail</th><th style={S.th}>URL</th>
+          <th style={S.th}>Detail</th><th style={S.th}>Meta</th><th style={S.th}>URL</th>
         </tr></thead>
         <tbody>
-          {rows.slice(0, 250).map((r, i) => (
-            <tr key={i}>
-              <td style={S.td}>
-                <span style={{ ...S.pill, background: statusColour(r.fragile ? 'fragile' : (r.verified ? 'verified' : 'candidate')) }}>
-                  {r.source_label || r.source || 'source'}
-                </span>
-              </td>
-              <td style={S.td}><strong>{r.title || r.name || r.display_name || r.login || '—'}</strong>
-                {r.author ? <div style={{ ...S.tag, marginTop:4 }}>{r.author}</div> : null}
-              </td>
-              <td style={S.td}>{r.snippet || r.detail || r.description || ''}</td>
-              <td style={S.td}>{r.url ? <a href={r.url} target="_blank" rel="noopener noreferrer"
-                style={{ ...S.mono, color:'#58a6ff' }}>{r.url}</a> : ''}</td>
-            </tr>
-          ))}
+          {rows.slice(0, 250).map((r, i) => {
+            const src = r.source_label || r.source || r.platform || 'source';
+            const handle = r.handle || r.acct || '';
+            const when = r.published || r.seen || r.last_paper || r.created_at || '';
+            return (
+              <tr key={i}>
+                <td style={S.td}>
+                  <span style={{ ...S.pill, background: r.platform ? platColour(r.platform) : statusColour(r.fragile ? 'fragile' : (r.verified ? 'verified' : 'candidate')) }}>
+                    {r.platform || src}
+                  </span>
+                  {r.platform && r.source && r.source !== r.platform &&
+                    <div style={{ color:'#8b949e', fontSize:10, marginTop:4 }}>{r.source}</div>}
+                </td>
+                <td style={S.td}>
+                  <strong style={{ lineHeight:1.35 }}>{r.title || r.name || r.display_name || r.login || '—'}</strong>
+                  {(r.author || handle) && <div style={{ ...S.tag, marginTop:4 }}>@{String(r.author || handle).replace(/^@/, '')}</div>}
+                  <MatchBadge row={r} />
+                </td>
+                <td style={{ ...S.td, maxWidth:340 }}>
+                  {(r.snippet || r.detail || r.description || r.bio || '').slice(0, 220)}
+                </td>
+                <td style={{ ...S.td, whiteSpace:'nowrap', color:'#8b949e', fontSize:11 }}>
+                  {when && <div>🕒 {relatizeTime(when)}</div>}
+                  {r.location && <div>📍 {String(r.location).slice(0, 40)}</div>}
+                  {r.reputation != null && <div>rep {r.reputation}</div>}
+                  {r.followers != null && <div>{r.followers} followers</div>}
+                  {r.institutions && <div style={{ maxWidth:120 }}>{String(r.institutions).slice(0, 40)}</div>}
+                  {r.rating != null && <div>score {r.rating}</div>}
+                </td>
+                <td style={S.td}>{r.url ? <a href={r.url} target="_blank" rel="noopener noreferrer"
+                  style={{ ...S.mono, color:'#58a6ff' }}>{String(r.url).replace(/^https?:\/\//, '').slice(0, 60)}</a> : ''}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

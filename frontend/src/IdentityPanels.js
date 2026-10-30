@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
-const S = {
+import { S as CYBER_S } from './cyberTheme';
+
+// Legacy values are kept for any panel-specific keys; CYBERDECK theme
+// values win for every shared key.
+const LEGACY_S = {
   section: { background:'#161b22', border:'1px solid #30363d', borderRadius:8, padding:20, marginBottom:20 },
   title:   { margin:'0 0 4px', fontSize:16, color:'#e6edf3' },
   sub:     { margin:'0 0 14px', fontSize:12, color:'#8b949e' },
@@ -24,7 +28,9 @@ const S = {
   stat:    { background:'#0d1117', border:'1px solid #30363d', borderRadius:8, padding:'10px 14px', minWidth:96 },
   num:     { display:'block', fontSize:20, fontWeight:700, color:'#e6edf3' },
   statL:   { fontSize:10, color:'#8b949e', textTransform:'uppercase', letterSpacing:'0.05em' },
+
 };
+const S = { ...LEGACY_S, ...CYBER_S };
 
 const Err = ({ e }) => e ? (
   <div style={{ ...S.card, border:'1px solid #e74c3c', background:'#2a1a1a', color:'#e74c3c', fontSize:13 }}>

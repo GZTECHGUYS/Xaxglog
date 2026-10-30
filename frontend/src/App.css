@@ -1,0 +1,81 @@
+/* Xaxglog CYBERDECK — global HUD effects */
+html, body {
+  background: #04060e;
+}
+
+/* full-viewport grid overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    linear-gradient(rgba(0, 229, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 255, 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 120% 90% at 50% 0%, #000 30%, transparent 78%);
+}
+
+/* CRT scanlines */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.16) 0px,
+    rgba(0, 0, 0, 0.16) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+}
+
+/* sweeping scan bar */
+body::before {
+  animation: hud-drift 24s linear infinite;
+}
+
+@keyframes hud-drift {
+  from { background-position: 0 0, 0 0; }
+  to   { background-position: 0 44px, 44px 0; }
+}
+
+/* inputs / selects / buttons: cyan caret + focus glow */
+input, select, textarea, button {
+  caret-color: #00e5ff;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: #00e5ff !important;
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.35), inset 0 0 10px rgba(0, 229, 255, 0.1);
+}
+button:hover { filter: brightness(1.35) saturate(1.2); }
+a { color: #00e5ff; }
+a:hover { text-shadow: 0 0 8px rgba(0, 229, 255, 0.7); }
+
+/* tables: pulsing HUD headers */
+th {
+  text-shadow: 0 0 8px rgba(0, 229, 255, 0.45);
+}
+
+/* neon scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: rgba(0, 10, 20, 0.6); }
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 229, 255, 0.25);
+  border: 1px solid rgba(0, 229, 255, 0.5);
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 229, 255, 0.45); }
+
+::selection { background: rgba(255, 43, 214, 0.45); color: #fff; }
+
+/* boot/type-in animation for big headings */
+h2, h3 { animation: hud-in 0.5s ease-out both; }
+@keyframes hud-in {
+  from { opacity: 0; letter-spacing: 6px; filter: brightness(2); }
+  to   { opacity: 1; }
+}

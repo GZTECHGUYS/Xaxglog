@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 
-const S = {
+import { S as CYBER_S } from './cyberTheme';
+
+// Legacy values are kept for any panel-specific keys; CYBERDECK theme
+// values win for every shared key.
+const LEGACY_S = {
   section: { display: 'flex', flexDirection: 'column', gap: 16 },
   card: { background: '#161b22', border: '1px solid #30363d', borderRadius: 10, padding: 16 },
   title: { margin: '0 0 8px', color: '#e6edf3', fontSize: 20 },
@@ -20,7 +24,9 @@ const S = {
   mono: { background: '#0d1117', border: '1px solid #30363d', color: '#c9d1d9', borderRadius: 8, padding: 12, fontSize: 12, maxHeight: 460, overflow: 'auto', whiteSpace: 'pre-wrap' },
   error: { color: '#f85149' },
   ok: { color: '#3fb950' },
+
 };
+const S = { ...LEGACY_S, ...CYBER_S };
 
 export function PlatformPanel({ api }) {
   const [overview, setOverview] = useState(null);

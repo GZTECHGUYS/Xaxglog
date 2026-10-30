@@ -78,6 +78,11 @@ def deb(source_dir):
         """))
     _write(os.path.join(stage, "usr", "bin", "xaxglog"),
            "#!/bin/sh\nexec /opt/xaxglog/Xaxglog \"$@\"\n", 0o755)
+    # CYBERDECK TUI: stdlib-only, runs on any system python3 against the
+    # packaged server's launcher.
+    _write(os.path.join(stage, "usr", "bin", "xaxglog-deck"),
+           "#!/bin/sh\nexec python3 /opt/xaxglog/_internal/tui/xaxglog_tui.py \"$@\"\n",
+           0o755)
     _write(os.path.join(stage, "usr", "share", "applications", "xaxglog.desktop"),
            textwrap.dedent("""\
            [Desktop Entry]

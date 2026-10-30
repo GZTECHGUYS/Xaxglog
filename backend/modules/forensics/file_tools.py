@@ -16,11 +16,18 @@ except ImportError:  # pragma: no cover
     TAGS = {}
     GPSTAGS = {}
 
-directory = os.path.join(os.path.dirname(__file__), 'static')
+# the upstream tree ships this under static_ref/ (reference assets, committed);
+# fall back to static/ for deployments that copied assets elsewhere
+_dir = os.path.dirname(__file__)
+directory = os.path.join(
+    _dir,
+    next((d for d in ('static_ref', 'static')
+          if os.path.isfile(os.path.join(_dir, d, 'exif_dict.json'))),
+         'static_ref'))
 file_name = 'exif_dict.json'
 file_path = os.path.join(directory, file_name)
 try:
-    with open(file_path, 'r') as json_file:
+    with open(file_path, 'r', encoding='utf-8') as json_file:
         ExifDict = json.load(json_file)
 except (OSError, ValueError):
     ExifDict = {}

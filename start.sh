@@ -12,14 +12,17 @@ for arg in "$@"; do
     --backend-only) MODE="backend" ;;
     --frontend-only) MODE="frontend" ;;
     --build) MODE="build" ;;
+    --tui) MODE="tui" ;;
     --no-install) INSTALL=0 ;;
     -h|--help)
       cat <<'EOF'
-Usage: ./start.sh [--backend-only|--frontend-only|--build] [--no-install]
+Usage: ./start.sh [--backend-only|--frontend-only|--build|--tui] [--no-install]
   (default)      start Flask API + React dev server
   --backend-only start only http://127.0.0.1:5000 (built-in console)
   --frontend-only start only the React dev server
   --build        build the React production bundle and exit
+  --tui          boot the backend, then open the CYBERDECK terminal console
+                 (login inside the deck first: `login <user> <pass>`)
 EOF
       exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
@@ -58,6 +61,23 @@ fi
 if [ "$MODE" = "backend" ]; then
   cd "$ROOT/backend"
   exec python app.py
+fi
+
+if [ "$MODE" = "tui" ]; then
+  cd "$ROOT/backend"
+  python app.py &
+  BACK_PID=$!
+  cd "$ROOT"
+  # wait for the API to accept, then drop the operator into the deck
+  for i in $(seq 1 30); do
+    if python - <<PY >/dev/null 2>&1
+import urllib.request
+urllib.request.urlopen("http://127.0.0.1:5000/api/health", timeout=2)
+PY
+    then break; fi
+    sleep 1
+  done
+  exec python "$ROOT/backend/tui/xaxglog_tui.py"
 fi
 
 cleanup() {

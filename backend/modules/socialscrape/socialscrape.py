@@ -10,7 +10,7 @@ as hashed evidence.
 
 What it does
 ------------
-  * 140+ platform catalog (global + CN/RU/JP/KR/SEA/VN/TH/ID/NG/LATAM/...)
+  * 180+ platform catalog (global + CN/RU/JP/KR/SEA/VN/TH/ID/NG/LATAM/...)
   * search-link matrix for platforms that only expose a web search UI
   * federated discovery through DuckDuckGo, SearXNG and Mojeek
   * regional public engines: Baidu, Yandex, Weibo, Telegram public preview
@@ -391,6 +391,74 @@ EXTRAS = [
      "category": "shopping", "region": "US", "domains": ["craigslist.org"]},
 ]
 
+# NEW_SOURCES — extended international catalog (2026 additions). Same shape as
+# EXTRAS: `profile` is the stable public profile URL ({u} = handle), `search`
+# is the platform's native search UI ({q} = query) or "" when there is none.
+NEW_SOURCES = [
+    # Streaming / short video / creator platforms
+    {"name": "Kick", "profile": "https://kick.com/{u}",
+     "search": "https://kick.com/search?query={q}", "category": "video",
+     "region": "global", "domains": ["kick.com"]},
+    {"name": "Trovo", "profile": "https://trovo.live/s/{u}",
+     "search": "https://trovo.live/search?keyword={q}", "category": "video",
+     "region": "global", "domains": ["trovo.live"]},
+    {"name": "Likee", "profile": "https://likee.video/@{u}",
+     "search": "", "category": "video", "region": "SEA",
+     "domains": ["likee.video"]},
+    {"name": "Triller", "profile": "https://triller.co/@{u}",
+     "search": "", "category": "video", "region": "global",
+     "domains": ["triller.co"]},
+    {"name": "Roposo", "profile": "https://www.roposo.com/@{u}",
+     "search": "https://www.roposo.com/search?q={q}", "category": "video",
+     "region": "IN", "domains": ["roposo.com"]},
+    {"name": "Kuaishou", "profile": "https://www.kuaishou.com/profile/{u}",
+     "search": "", "category": "video", "region": "CN",
+     "domains": ["kuaishou.com"]},
+    {"name": "VK Video", "profile": "https://vkvideo.ru/@{u}",
+     "search": "https://vkvideo.ru/search?q={q}", "category": "video",
+     "region": "RU", "domains": ["vkvideo.ru"]},
+    # Music / audio
+    {"name": "Mixcloud", "profile": "https://www.mixcloud.com/{u}/",
+     "search": "https://www.mixcloud.com/search/?q={q}", "category": "music",
+     "region": "global", "domains": ["mixcloud.com"]},
+    {"name": "Audiomack", "profile": "https://audiomack.com/{u}",
+     "search": "https://audiomack.com/search?q={q}", "category": "music",
+     "region": "global", "domains": ["audiomack.com"]},
+    # Media / communities / forums
+    {"name": "Imgur", "profile": "https://imgur.com/user/{u}",
+     "search": "https://imgur.com/search?q={q}", "category": "creative",
+     "region": "global", "domains": ["imgur.com"]},
+    {"name": "Farcaster", "profile": "https://warpcast.com/{u}",
+     "search": "", "category": "community", "region": "global",
+     "domains": ["warpcast.com"]},
+    {"name": "Tildes", "profile": "https://tildes.net/user/{u}",
+     "search": "https://tildes.net/search?q={q}", "category": "forum",
+     "region": "global", "domains": ["tildes.net"]},
+    {"name": "Dreamwidth", "profile": "https://{u}.dreamwidth.org",
+     "search": "", "category": "blog", "region": "global",
+     "domains": ["dreamwidth.org"]},
+    {"name": "Plurk", "profile": "https://www.plurk.com/{u}",
+     "search": "https://www.plurk.com/search?q={q}", "category": "social",
+     "region": "SEA", "domains": ["plurk.com"]},
+    {"name": "Baidu Zhidao", "profile": "",
+     "search": "https://zhidao.baidu.com/search?word={q}", "category": "forum",
+     "region": "CN", "domains": ["zhidao.baidu.com"]},
+    # Code / writing / funding
+    {"name": "Hashnode", "profile": "https://hashnode.com/@{u}",
+     "search": "https://hashnode.com/search?q={q}", "category": "code",
+     "region": "global", "domains": ["hashnode.com"]},
+    {"name": "Subscribestar", "profile": "https://www.subscribestar.com/{u}",
+     "search": "", "category": "shopping", "region": "global",
+     "domains": ["subscribestar.com"]},
+    # Gaming
+    {"name": "Chess.com", "profile": "https://www.chess.com/member/{u}",
+     "search": "", "category": "gaming", "region": "global",
+     "domains": ["chess.com"]},
+    {"name": "Lichess", "profile": "https://lichess.org/@/{u}",
+     "search": "", "category": "gaming", "region": "global",
+     "domains": ["lichess.org"]},
+]
+
 # oEmbed endpoints (public, keyless). The provider returns JSON metadata.
 OEMBED = {
     "TikTok": "https://www.tiktok.com/oembed?url={url}",
@@ -400,6 +468,10 @@ OEMBED = {
     "SoundCloud": "https://soundcloud.com/oembed?format=json&url={url}",
     "Spotify": "https://open.spotify.com/oembed?url={url}",
     "Reddit": "https://www.reddit.com/oembed?url={url}",
+    "Dailymotion": "https://www.dailymotion.com/services/oembed?url={url}",
+    "Tumblr": "https://www.tumblr.com/oembed/1.0?url={url}",
+    "Mixcloud": "https://app.mixcloud.com/oembed/?url={url}",
+    "Flickr": "https://www.flickr.com/services/oembed?url={url}",
 }
 
 
@@ -466,6 +538,21 @@ def _build_catalog():
             rec["region"] = extra.get("region", rec["region"])
             rec["adapter"] = extra.get("adapter", rec["adapter"])
             rec["notes"] = extra.get("notes", rec.get("notes", ""))
+    for extra in NEW_SOURCES:
+        key = extra["name"].lower()
+        if key in seen:
+            continue
+        rec = {
+            "name": extra["name"], "profile_template": extra.get("profile", ""),
+            "category": extra.get("category", "social"),
+            "region": extra.get("region", "global"),
+            "search_template": extra.get("search", ""),
+            "domains": list(extra.get("domains") or []),
+            "adapter": extra.get("adapter", "public_html"),
+            "notes": extra.get("notes", ""),
+        }
+        rows.append(rec)
+        seen[key] = rec
     for rec in rows:
         rec["domains"] = [d for d in rec.get("domains") or [] if d]
         rec["searchable"] = bool(rec.get("search_template"))
@@ -529,9 +616,10 @@ def catalog():
         "regions": REGIONS,
         "categories": CATEGORIES,
         "engines": ["ddg", "searx", "mojeek", "baidu", "yandex", "weibo",
-                    "telegram", "reddit", "bluesky", "lemmy"],
+                    "telegram", "reddit", "bluesky", "lemmy", "hn", "mastodon"],
         "adapters": ["public_html", "opengraph", "twitter_card", "jsonld",
-                     "oembed", "reddit_json", "bluesky_api", "lemmy_api"],
+                     "oembed", "reddit_json", "bluesky_api", "lemmy_api",
+                     "hn_algolia", "mastodon_tag"],
         "platform_list": PLATFORMS,
         "limits": {"max_html_bytes": MAX_HTML, "redirects": MAX_REDIRECTS,
                    "max_images": MAX_IMAGES, "max_links": MAX_LINKS,
@@ -1218,6 +1306,73 @@ def lemmy_search(query, limit=25):
             "count": len(rows)}
 
 
+def hn_search(query, limit=25):
+    """Hacker News stories + comments via the keyless Algolia API."""
+    res = _json_get("https://hn.algolia.com/api/v1/search",
+                    {"query": query, "hitsPerPage": max(1, min(int(limit or 25), 50))})
+    if res.get("status") != "ok":
+        return {"engine": "hn", "status": res.get("status", "error"),
+                "results": [], "error": res.get("error", ""), "http": res.get("http")}
+    rows = []
+    for h in (res.get("data") or {}).get("hits") or []:
+        oid = h.get("objectID") or ""
+        if not oid:
+            continue
+        is_comment = bool(h.get("comment_text"))
+        url = h.get("url") or ""
+        if is_comment:
+            url = "https://news.ycombinator.com/item?id=%s" % oid
+        title = h.get("title") or _clean(h.get("story_title") or "") \
+            or (h.get("comment_text") or "")[:120] or "HN item"
+        text = h.get("story_text") or h.get("comment_text") or ""
+        rows.append({
+            "title": title,
+            "url": url or "https://news.ycombinator.com/item?id=%s" % oid,
+            "snippet": _clean(text)[:400],
+            "author": h.get("author") or "",
+            "published": _iso(h.get("created_at")),
+            "platform": "HackerNews", "source": "hn_algolia",
+            "meta": {"points": h.get("points"), "comments": h.get("num_comments"),
+                     "kind": "comment" if is_comment else "story"},
+        })
+    return {"engine": "hn", "status": "ok", "results": rows, "count": len(rows)}
+
+
+def mastodon_tag_search(hashtag, limit=25):
+    """Public hashtag timeline on mastodon.social (keyless).
+
+    Only meaningful for ``#tag`` queries; returns ``not_supported`` otherwise.
+    """
+    tag = (hashtag or "").strip().lstrip("#")
+    if not tag or " " in tag:
+        return {"engine": "mastodon", "status": "not_supported",
+                "results": [], "error": "mastodon tag search needs a single #hashtag"}
+    res = _json_get("https://mastodon.social/api/v1/timelines/tag/%s"
+                    % urllib.parse.quote(tag, safe=""),
+                    {"limit": max(1, min(int(limit or 25), 40))})
+    if res.get("status") != "ok":
+        return {"engine": "mastodon", "status": res.get("status", "error"),
+                "results": [], "error": res.get("error", ""), "http": res.get("http")}
+    rows = []
+    for st in res.get("data") or []:
+        if not isinstance(st, dict):
+            continue
+        acct = (st.get("account") or {}).get("acct") or ""
+        url = st.get("url") or ""
+        if not url:
+            continue
+        rows.append({
+            "title": _clean(st.get("content") or "")[:120] or ("Mastodon post by @%s" % acct),
+            "url": url,
+            "snippet": _clean(st.get("content") or "")[:400],
+            "author": "@" + acct if acct else "",
+            "published": _iso(st.get("created_at")),
+            "platform": "Mastodon", "source": "mastodon_tag",
+            "meta": {"boosts": st.get("reblogs_count"), "favourites": st.get("favourites_count")},
+        })
+    return {"engine": "mastodon", "status": "ok", "results": rows, "count": len(rows)}
+
+
 def _run_engines(query, dork, selected, engines=None, region="all"):
     """Run federated + regional + keyless API engines concurrently."""
     out = {}
@@ -1252,6 +1407,10 @@ def _run_engines(query, dork, selected, engines=None, region="all"):
         tasks["bluesky"] = lambda: bluesky_search(query)
     if not names or "Lemmy" in names:
         tasks["lemmy"] = lambda: lemmy_search(query)
+    if not names or "HackerNews" in names:
+        tasks["hn"] = lambda: hn_search(query)
+    if q.lstrip("@").startswith("#"):
+        tasks["mastodon"] = lambda: mastodon_tag_search(query)
     if tasks:
         with ThreadPoolExecutor(max_workers=min(8, len(tasks))) as ex:
             futs = {ex.submit(fn): name for name, fn in tasks.items()}
@@ -1293,6 +1452,8 @@ def _normalize_engine_results(engines):
                 "source": item.get("source") or engine,
                 "engines": [engine], "is_social": bool(platform),
             }
+            if isinstance(item.get("meta"), dict):
+                rec["meta"] = item["meta"]
             key = _norm_url(url) or ("%s|%s" % (platform, title))
             if key in by_url:
                 old = by_url[key]

@@ -521,7 +521,10 @@ def check_username(username, categories=None, max_workers=20):
         by_cat.setdefault(h.get("category", "other"), []).append(h)
     status_counts = {}
     for r in results:
-        status_counts[r.get("status")] = status_counts.get(r.get("status"), 0) + 1
+        # str() — status keys mix HTTP codes (int) and words ("blocked"); Flask
+        # jsonify sorts dict keys (sort_keys=True) and dies on mixed types.
+        s = str(r.get("status"))
+        status_counts[s] = status_counts.get(s, 0) + 1
     return {
         "input": username,
         "checked": len(results),

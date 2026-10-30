@@ -13,6 +13,7 @@ hiddenimports = collect_submodules("modules", on_error="ignore")
 hiddenimports += collect_submodules("routes", on_error="ignore")
 datas = [
     (os.path.join(BACKEND, "templates"), "templates"),
+    (os.path.join(BACKEND, "tui"), "tui"),
     (os.path.join(ROOT, "catalog"), "catalog"),
 ]
 datas += collect_data_files("modules")
