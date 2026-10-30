@@ -14,6 +14,9 @@
     "recharts": "^3.8.1",
     "web-vitals": "^2.1.4"
   },
+  "devDependencies": {
+    "typescript": "^4.9.5"
+  },
   "scripts": {
     "prestart": "node scripts/ensure-deps.js",
     "start": "react-scripts start",
